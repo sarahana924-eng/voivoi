@@ -88,7 +88,7 @@ button:hover{background:#2b3b4d}button:disabled{opacity:.45;cursor:not-allowed}
 </head>
 <body>
 <div class="wrap">
-<h1>Idle Growth Game v37</h1>
+<h1>Idle Growth Game v38</h1>
 <div class="muted">マップ15まで実装・エリアボス撃破で次マップ解放</div>
 
 <div class="tabs">
@@ -437,6 +437,16 @@ const SUPPORT_MAX_UNITS=36;
 const SUPPORT_RARITY_POINTS={R:30,SR:45,SSR:60};
 const SUPPORT_STATS=["攻撃力","防御力","最大体力","素早さ","知力"];
 const SUPPORT_EFFECT_IDS=["cap","rate","growth","heal","battle","mind","gacha","item","exp","history","stat"];
+function supportStoredEffects(card){
+  return Array.isArray(card.effects)?card.effects:[];
+}
+function supportEffectiveEffectsForCard(card){
+  const all=supportStoredEffects(card), active=all.filter(e=>e.enabled!==false);
+  const off=all.filter(e=>e.enabled===false).reduce((a,e)=>a+(Number(e.points)||0),0);
+  const bonus=active.length?off/active.length:0;
+  return active.filter(e=>(Number(e.points)||0)>0).map(e=>({...e,points:(Number(e.points)||0)+bonus}));
+}
+
 function supportEffectBaseValue(effectId,points){
  const p=Math.max(0,Number(points)||0);
  if(effectId==="cap") return p*10;
@@ -454,7 +464,13 @@ function supportEffectBaseValue(effectId,points){
 }
 function supportPointsTotal(card){return (card.effects||[]).reduce((a,e)=>a+(Number(e.points)||0),0)}
 function supportEffectValue(card,e){
- return supportEffectBaseValue(e.effectId,e.points)*supportRarityDef(card.rarity).mult;
+ const rarity=supportRarityDef(card.rarity);
+ let points=Number(e.points)||0;
+ const active=(card.effects||[]).filter(x=>x.enabled!==false);
+ const off=(card.effects||[]).filter(x=>x.enabled===false).reduce((a,x)=>a+(Number(x.points)||0),0);
+ if(e.enabled===false)return 0;
+ if(active.length)points+=off/active.length;
+ return supportEffectBaseValue(e.effectId,points)*rarity.mult;
 }
 function supportEffectLabel(e){
  const d=supportEffectDef(e.effectId);
@@ -497,17 +513,18 @@ function openSupportWorkshop(){
  <h4>固有能力のポイント配分</h4>
  <p class="muted">R=30P、SR=45P、SSR=60P。初期状態では自動配布されます。各能力のPを自由に調整できます。</p>
  <div id="supportEffectEditor"></div>
- <div class="notice">使用ポイント：<b id="swUsedPoints">0</b> / <b id="swMaxPoints">30</b>P</div>
+ <div class="notice">使用ポイント：<b id="swUsedPoints">0</b> / <b id="swMaxPoints">30</b>P<br><span id="supportOffNote"></span></div>
  <div class="notice" id="supportPreview"></div>
  <button onclick="createSupportCard()">この内容で保存してカードコードを発行</button>`;
  document.getElementById("swRarity").addEventListener("change",()=>renderSupportEffectEditor(true));
  document.getElementById("swType").addEventListener("change",updateSupportPreview);
  renderSupportEffectEditor(true);
 }
-function supportEffectRowHTML(id,points){
+function supportEffectRowHTML(id,points,enabled=true){
  const d=supportEffectDef(id), need=["cap","rate","growth","history","stat"].includes(id);
  return `<div class="supportCard" data-effect-id="${id}">
  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+ <label style="display:flex;flex-direction:row;align-items:center;gap:4px"><input class="effectEnabled" type="checkbox" ${enabled?"checked":""}> ON</label>
  <b>${d.name}</b><input class="effectPoints" type="number" min="0" max="60" value="${points}" style="width:75px"><span>P</span>
  ${need?`<select class="effectStat">${SUPPORT_STATS.map(x=>`<option>${x}</option>`).join("")}</select>`:""}
  </div><small class="muted">${d.desc}</small></div>`;
@@ -515,39 +532,56 @@ function supportEffectRowHTML(id,points){
 function renderSupportEffectEditor(auto){
  const box=document.getElementById("supportEffectEditor"); if(!box)return;
  const rarity=document.getElementById("swRarity")?.value||"R", total=SUPPORT_RARITY_POINTS[rarity];
- let values={};
- if(!auto) [...box.querySelectorAll("[data-effect-id]")].forEach(row=>values[row.dataset.effectId]=Number(row.querySelector(".effectPoints")?.value)||0);
- else{
+ let vals={}, ons={};
+ if(auto){
    const base=Math.floor(total/SUPPORT_EFFECT_IDS.length), rem=total%SUPPORT_EFFECT_IDS.length;
-   SUPPORT_EFFECT_IDS.forEach((id,i)=>values[id]=base+(i<rem?1:0));
+   SUPPORT_EFFECT_IDS.forEach((id,i)=>{vals[id]=base+(i<rem?1:0);ons[id]=true});
+ }else{
+   [...box.querySelectorAll("[data-effect-id]")].forEach(row=>{
+     vals[row.dataset.effectId]=Number(row.querySelector(".effectPoints")?.value)||0;
+     ons[row.dataset.effectId]=row.querySelector(".effectEnabled")?.checked!==false;
+   });
  }
- box.innerHTML=SUPPORT_EFFECT_IDS.map(id=>supportEffectRowHTML(id,values[id]||0)).join("");
- box.querySelectorAll(".effectPoints").forEach(x=>x.addEventListener("input",()=>updateSupportAllocation()));
+ box.innerHTML=SUPPORT_EFFECT_IDS.map(id=>supportEffectRowHTML(id,vals[id]||0,ons[id]!==false)).join("");
+ box.querySelectorAll(".effectPoints,.effectEnabled").forEach(x=>x.addEventListener("input",updateSupportAllocation));
+ box.querySelectorAll(".effectEnabled").forEach(x=>x.addEventListener("change",updateSupportAllocation));
  box.querySelectorAll(".effectStat").forEach(x=>x.addEventListener("change",updateSupportPreview));
  updateSupportAllocation();
 }
 function updateSupportAllocation(){
  const rarity=document.getElementById("swRarity")?.value||"R", max=SUPPORT_RARITY_POINTS[rarity];
- const inputs=[...document.querySelectorAll("#supportEffectEditor .effectPoints")];
- let used=inputs.reduce((a,x)=>a+Math.max(0,Math.floor(Number(x.value)||0)),0);
+ const rows=[...document.querySelectorAll("#supportEffectEditor [data-effect-id]")];
+ let used=rows.reduce((a,row)=>a+Math.max(0,Math.floor(Number(row.querySelector(".effectPoints")?.value)||0)),0);
  if(used>max){
    let excess=used-max;
-   for(let i=inputs.length-1;i>=0&&excess;i--){
-     const v=Math.max(0,Math.floor(Number(inputs[i].value)||0)),take=Math.min(v,excess);
-     inputs[i].value=v-take; excess-=take;
+   for(let i=rows.length-1;i>=0&&excess;i--){
+     const inp=rows[i].querySelector(".effectPoints"),v=Math.max(0,Math.floor(Number(inp.value)||0)),take=Math.min(v,excess);
+     inp.value=v-take;excess-=take;
    }
    used=max;
  }
+ const active=rows.filter(r=>r.querySelector(".effectEnabled")?.checked);
+ const off=used-active.reduce((a,r)=>a+Math.max(0,Math.floor(Number(r.querySelector(".effectPoints")?.value)||0)),0);
+ const bonus=active.length?off/active.length:0;
  document.getElementById("swUsedPoints").textContent=used;
  document.getElementById("swMaxPoints").textContent=max;
+ const note=document.getElementById("supportOffNote");
+ if(note)note.textContent=active.length&&off?`OFFにした能力の${off}PをONの${active.length}能力へ均等再配分：各+${bonus.toFixed(2)}P`:"OFFによる再配分なし";
  updateSupportPreview();
 }
-function collectSupportEffects(){
+function collectSupportRawEffects(){
  return [...document.querySelectorAll("#supportEffectEditor [data-effect-id]")].map(row=>({
    effectId:row.dataset.effectId,
    points:Math.max(0,Math.floor(Number(row.querySelector(".effectPoints")?.value)||0)),
+   enabled:row.querySelector(".effectEnabled")?.checked!==false,
    stat:row.querySelector(".effectStat")?.value||null
  })).filter(e=>e.points>0);
+}
+function collectSupportEffects(){
+ const raw=collectSupportRawEffects(), active=raw.filter(e=>e.enabled!==false);
+ const off=raw.filter(e=>e.enabled===false).reduce((a,e)=>a+e.points,0);
+ const bonus=active.length?off/active.length:0;
+ return active.map(e=>({...e,points:e.points+bonus}));
 }
 function updateSupportPreview(){
  const box=document.getElementById("supportPreview"); if(!box)return;
@@ -563,7 +597,7 @@ function updateSupportPreview(){
 function createSupportCard(){
  normalizeSupport();
  const rarity=document.getElementById("swRarity")?.value||"R";
- const total=SUPPORT_RARITY_POINTS[rarity], effects=collectSupportEffects();
+ const total=SUPPORT_RARITY_POINTS[rarity], effects=collectSupportRawEffects();
  const used=effects.reduce((a,e)=>a+e.points,0);
  if(used!==total){alert(`制作ポイントを${total}Pちょうど配分してください。現在${used}Pです。`);return}
  const [typeId,markId]=(document.getElementById("swType")?.value||"moon|full").split("|");
@@ -689,7 +723,7 @@ function resetGameData(){
   weights:{攻撃力:20,防御力:20,最大体力:20,素早さ:20,知力:20},
   max:{攻撃力:1,防御力:1,最大体力:1,素早さ:1,知力:1}
  };
- try{localStorage.removeItem("idleGrowthGameSaveV34");localStorage.removeItem("idleGrowthGameSaveV37")}catch(e){}
+ try{localStorage.removeItem("idleGrowthGameSaveV34");localStorage.removeItem("idleGrowthGameSaveV38")}catch(e){}
  normalizeMarks();
  normalizeUsedCodes();
 }
@@ -977,12 +1011,12 @@ function formatDuration(sec){
 function saveGame(){
  try{
   G.offlineAt=G.offlineAt||Date.now();
-  localStorage.setItem("idleGrowthGameSaveV37",JSON.stringify(G));
+  localStorage.setItem("idleGrowthGameSaveV38",JSON.stringify(G));
  }catch(e){console.warn("save failed",e)}
 }
 function loadGame(){
  try{
-  const raw=localStorage.getItem("idleGrowthGameSaveV37")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
+  const raw=localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
   if(raw){
    const saved=JSON.parse(raw);
    if(saved&&typeof saved==="object") Object.assign(G,saved);
