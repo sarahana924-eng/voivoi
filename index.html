@@ -88,7 +88,7 @@ button:hover{background:#2b3b4d}button:disabled{opacity:.45;cursor:not-allowed}
 </head>
 <body>
 <div class="wrap">
-<h1>Idle Growth Game v36</h1>
+<h1>Idle Growth Game v37</h1>
 <div class="muted">マップ15まで実装・エリアボス撃破で次マップ解放</div>
 
 <div class="tabs">
@@ -409,17 +409,17 @@ const SUPPORT_TYPES=[
  ]}
 ];
 const SUPPORT_EFFECTS=[
- {id:"cap",name:"〇〇上限値アップ",unit:"実数",desc:"そのステータスの上限値がセット中だけ上がる。"},
- {id:"rate",name:"〇〇得意率アップ",unit:"ウェイト",desc:"そのステータスが成長抽選で選ばれやすくなる。"},
- {id:"growth",name:"〇〇成長率アップ",unit:"%",desc:"そのステータスが選ばれたとき、少し成長しやすくなる。"},
- {id:"heal",name:"回復量アップ",unit:"%",desc:"戦闘中の回復量が増える。"},
- {id:"battle",name:"戦闘ボーナス",unit:"%",desc:"戦闘終了時に追加成長を1回行い、その成長量が増える。"},
- {id:"mind",name:"心得ポイントボーナス",unit:"P",desc:"獲得する心得ポイントが増える。"},
- {id:"gacha",name:"ガチャステータスボーナス",unit:"%",desc:"ガチャで獲得するステータスが増える。"},
- {id:"item",name:"アイテムボーナス",unit:"%",desc:"獲得アイテム量が増える。"},
- {id:"exp",name:"経験値ボーナス",unit:"%",desc:"獲得経験値が増える。"},
- {id:"history",name:"歴戦〇〇ボーナス",unit:"%",desc:"レベルアップ時、そのステータスの増加量が増える。"},
- {id:"stat",name:"〇〇ボーナス",unit:"実数",desc:"成長時、そのステータスが追加で上がる。"}
+ {id:"cap",name:"上限値アップ",unit:"",desc:"そのステータスの上限値がセット中だけ上がる。"},
+ {id:"rate",name:"得意率アップ",unit:"",desc:"そのステータスが成長抽選で選ばれやすくなる。"},
+ {id:"growth",name:"成長率アップ",unit:"%",desc:"そのステータスが選ばれたとき少し成長しやすくなる。"},
+ {id:"heal",name:"回復量アップ",unit:"%",desc:"回復量が少し上がる。"},
+ {id:"battle",name:"戦闘ボーナス",unit:"%",desc:"戦闘終了時に成長を一度だけ行い、その増加量が増える。"},
+ {id:"mind",name:"心得ポイントボーナス",unit:"P",desc:"心得ポイントのもらえる量が増える。"},
+ {id:"gacha",name:"ガチャステータスボーナス",unit:"%",desc:"ガチャでもらえるステータスが少し増える。"},
+ {id:"item",name:"アイテムボーナス",unit:"%",desc:"アイテムが少し増えたりする。"},
+ {id:"exp",name:"経験値ボーナス",unit:"%",desc:"経験値が少し増える。"},
+ {id:"history",name:"歴戦ボーナス",unit:"%",desc:"そのステータスがレベルアップするとき増加する。"},
+ {id:"stat",name:"ボーナス",unit:"",desc:"成長時そのステータスが追加で上がるようになる。"}
 ];
 const SUPPORT_TRIGGERS=[
  {id:"hp80",name:"HP80%以上",parts:1,units:7},
@@ -434,6 +434,33 @@ const SUPPORT_RARITIES=[
 ];
 const SUPPORT_STAT_EFFECTS=["攻撃力","防御力","最大体力","素早さ","知力"];
 const SUPPORT_MAX_UNITS=36;
+const SUPPORT_RARITY_POINTS={R:30,SR:45,SSR:60};
+const SUPPORT_STATS=["攻撃力","防御力","最大体力","素早さ","知力"];
+const SUPPORT_EFFECT_IDS=["cap","rate","growth","heal","battle","mind","gacha","item","exp","history","stat"];
+function supportEffectBaseValue(effectId,points){
+ const p=Math.max(0,Number(points)||0);
+ if(effectId==="cap") return p*10;
+ if(effectId==="rate") return p*2;
+ if(effectId==="growth") return p*1;
+ if(effectId==="heal") return p*1;
+ if(effectId==="battle") return p*1;
+ if(effectId==="mind") return p;
+ if(effectId==="gacha") return p*1;
+ if(effectId==="item") return p*1;
+ if(effectId==="exp") return p*1;
+ if(effectId==="history") return p*1;
+ if(effectId==="stat") return p;
+ return p;
+}
+function supportPointsTotal(card){return (card.effects||[]).reduce((a,e)=>a+(Number(e.points)||0),0)}
+function supportEffectValue(card,e){
+ return supportEffectBaseValue(e.effectId,e.points)*supportRarityDef(card.rarity).mult;
+}
+function supportEffectLabel(e){
+ const d=supportEffectDef(e.effectId);
+ return d.name+(e.stat?`（${e.stat}）`:"");
+}
+
 
 function supportTypeName(card){
  const t=SUPPORT_TYPES.find(x=>x.id===card.typeId);
@@ -444,120 +471,105 @@ function supportEffectDef(id){return SUPPORT_EFFECTS.find(x=>x.id===id)||SUPPORT
 function supportTriggerDef(id){return SUPPORT_TRIGGERS.find(x=>x.id===id)||SUPPORT_TRIGGERS[3]}
 function supportRarityDef(id){return SUPPORT_RARITIES.find(x=>x.id===id)||SUPPORT_RARITIES[0]}
 function supportUnitLabel(card){
+ if(Array.isArray(card.effects)) return card.effects.map(supportEffectLabel).join(" / ");
  const e=supportEffectDef(card.effectId);
- const stat=card.stat||"";
- return e.name.replace("〇〇",stat);
-}
-function supportEffectValue(card){
- const rarity=supportRarityDef(card.rarity);
- const units=Math.max(1,Math.min(36,Number(card.units)||1));
- const baseUnits=units/36;
- if(card.effectId==="cap") return Math.round(300*baseUnits*rarity.mult);
- if(card.effectId==="mind") return Math.max(1,Math.round(6*baseUnits*rarity.mult*100)/100);
- if(card.effectId==="rate") return Math.round(60*baseUnits*rarity.mult*100)/100;
- if(card.effectId==="stat") return Math.round(6*baseUnits*rarity.mult*100)/100;
- if(card.effectId==="battle") return Math.round((50+100*baseUnits)*100)/100;
- return Math.round(30*baseUnits*rarity.mult*100)/100;
-}
-function supportSlots(){
- const r=Number(G.rebirth)||0;
- const thresholds=[0,5,15,30,50,75,105,140,180,225,275,330,390,455,525,600,680,765,855,950];
- let n=1;
- thresholds.forEach((v,i)=>{if(r>=v)n=Math.max(n,i+1)});
- if(r>=1050)n+=Math.floor((r-1050)/100)+1;
- return Math.min(99,n);
-}
-function normalizeSupport(){
- if(!Array.isArray(G.supportCards))G.supportCards=[];
- G.supportCards=G.supportCards.filter(c=>c&&c.id&&supportTypeName(c)!=="不明・不明").map(c=>({
-   id:String(c.id),
-   typeId:c.typeId,
-   markId:c.markId,
-   rarity:supportRarityDef(c.rarity).id,
-   effectId:supportEffectDef(c.effectId).id,
-   stat:c.stat||null,
-   triggerId:supportTriggerDef(c.triggerId).id,
-   units:Math.max(1,Math.min(36,Math.floor(Number(c.units)||1))),
-   code:String(c.code||""),
-   createdAt:Number(c.createdAt)||Date.now()
- }));
- if(!Array.isArray(G.supportEquipped))G.supportEquipped=[];
- G.supportEquipped=G.supportEquipped.map(x=>x===null?null:String(x)).slice(0,supportSlots());
- while(G.supportEquipped.length<supportSlots())G.supportEquipped.push(null);
-}
-function makeSupportCode(){
- let code="";
- do{
-   code="SC-"+Date.now().toString(36).toUpperCase()+"-"+Math.random().toString(36).slice(2,8).toUpperCase();
- }while(G.supportCards.some(c=>c.code===code));
- return code;
-}
-function supportDuplicateCount(cardId){
- return G.supportEquipped.filter(x=>x===cardId).length;
-}
-function supportFinalMultiplier(cardId){
- const n=supportDuplicateCount(cardId);
- return 1+Math.min(6,Math.max(0,n-1))*.05;
+ return e.name+(card.stat?`（${card.stat}）`:"");
 }
 function supportCardText(card){
- const tr=supportTriggerDef(card.triggerId);
- const e=supportEffectValue(card);
- const u=supportEffectDef(card.effectId).unit;
- const value=(e*tr.units/1);
- const shown=value.toFixed(2).replace(/\.00$/,"");
- return `${supportUnitLabel(card)}：${shown}${u}`;
+ if(Array.isArray(card.effects)){
+   return card.effects.map(e=>{
+     const d=supportEffectDef(e.effectId), v=supportEffectValue(card,e);
+     const val=Number.isInteger(v)?v:v.toFixed(2);
+     return `${supportEffectLabel(e)}：${val}${d.unit}`;
+   }).join("<br>");
+ }
+ return supportUnitLabel(card);
 }
 function openSupportWorkshop(){
  const box=document.getElementById("supportWorkshop"); if(!box)return;
+ const rarities=SUPPORT_RARITIES.map(x=>`<option value="${x.id}">${x.name}（制作ポイント ${SUPPORT_RARITY_POINTS[x.id]}P / 効果×${x.mult}）</option>`).join("");
+ const types=SUPPORT_TYPES.map(t=>`<optgroup label="${t.name}">${t.marks.map(m=>`<option value="${t.id}|${m.id}">${t.name}：${m.name} — ${m.desc}</option>`).join("")}</optgroup>`).join("");
  box.innerHTML=`
  <div class="supportGrid">
-  <label>レア度<select id="swRarity">${SUPPORT_RARITIES.map(x=>`<option value="${x.id}">${x.name}（出現率 ${x.chance}% / 効果×${x.mult}）</option>`).join("")}</select></label>
-  <label>天星タイプ<select id="swType">${SUPPORT_TYPES.map(t=>`<optgroup label="${t.name}">${t.marks.map(m=>`<option value="${t.id}|${m.id}">${t.name}：${m.name} — ${m.desc}</option>`).join("")}</optgroup>`).join("")}</select></label>
-  <label>固有効果<select id="swEffect">${SUPPORT_EFFECTS.map(e=>`<option value="${e.id}">${e.name}</option>`).join("")}</select></label>
-  <label>対象ステータス<select id="swStat"><option value="">対象なし</option>${SUPPORT_STAT_EFFECTS.map(x=>`<option>${x}</option>`).join("")}</select></label>
-  <label>固有スキル<select id="swTrigger">${SUPPORT_TRIGGERS.map(x=>`<option value="${x.id}">${x.name}：${x.parts===2?"3/36を2つ":" "+x.units+"/36"}</option>`).join("")}</select></label>
-  <label>効果量<select id="swUnits">${Array.from({length:36},(_,i)=>`<option value="${i+1}">${i+1}/36</option>`).join("")}</select></label>
+  <label>レア度<select id="swRarity">${rarities}</select></label>
+  <label>天星タイプ<select id="swType">${types}</select></label>
  </div>
- <div class="notice" id="supportPreview" style="margin-top:10px"></div>
- <button onclick="createSupportCard()">この内容で保存してカードコードを発行</button>
- <p class="muted">制作ではレア度・天星タイプ・固有効果・対象ステータス・固有スキル・効果量をすべて選択できます。</p>`;
- ["swRarity","swType","swEffect","swStat","swTrigger","swUnits"].forEach(id=>{
-   document.getElementById(id)?.addEventListener("change",updateSupportPreview);
- });
+ <h4>固有能力のポイント配分</h4>
+ <p class="muted">R=30P、SR=45P、SSR=60P。初期状態では自動配布されます。各能力のPを自由に調整できます。</p>
+ <div id="supportEffectEditor"></div>
+ <div class="notice">使用ポイント：<b id="swUsedPoints">0</b> / <b id="swMaxPoints">30</b>P</div>
+ <div class="notice" id="supportPreview"></div>
+ <button onclick="createSupportCard()">この内容で保存してカードコードを発行</button>`;
+ document.getElementById("swRarity").addEventListener("change",()=>renderSupportEffectEditor(true));
+ document.getElementById("swType").addEventListener("change",updateSupportPreview);
+ renderSupportEffectEditor(true);
+}
+function supportEffectRowHTML(id,points){
+ const d=supportEffectDef(id), need=["cap","rate","growth","history","stat"].includes(id);
+ return `<div class="supportCard" data-effect-id="${id}">
+ <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+ <b>${d.name}</b><input class="effectPoints" type="number" min="0" max="60" value="${points}" style="width:75px"><span>P</span>
+ ${need?`<select class="effectStat">${SUPPORT_STATS.map(x=>`<option>${x}</option>`).join("")}</select>`:""}
+ </div><small class="muted">${d.desc}</small></div>`;
+}
+function renderSupportEffectEditor(auto){
+ const box=document.getElementById("supportEffectEditor"); if(!box)return;
+ const rarity=document.getElementById("swRarity")?.value||"R", total=SUPPORT_RARITY_POINTS[rarity];
+ let values={};
+ if(!auto) [...box.querySelectorAll("[data-effect-id]")].forEach(row=>values[row.dataset.effectId]=Number(row.querySelector(".effectPoints")?.value)||0);
+ else{
+   const base=Math.floor(total/SUPPORT_EFFECT_IDS.length), rem=total%SUPPORT_EFFECT_IDS.length;
+   SUPPORT_EFFECT_IDS.forEach((id,i)=>values[id]=base+(i<rem?1:0));
+ }
+ box.innerHTML=SUPPORT_EFFECT_IDS.map(id=>supportEffectRowHTML(id,values[id]||0)).join("");
+ box.querySelectorAll(".effectPoints").forEach(x=>x.addEventListener("input",()=>updateSupportAllocation()));
+ box.querySelectorAll(".effectStat").forEach(x=>x.addEventListener("change",updateSupportPreview));
+ updateSupportAllocation();
+}
+function updateSupportAllocation(){
+ const rarity=document.getElementById("swRarity")?.value||"R", max=SUPPORT_RARITY_POINTS[rarity];
+ const inputs=[...document.querySelectorAll("#supportEffectEditor .effectPoints")];
+ let used=inputs.reduce((a,x)=>a+Math.max(0,Math.floor(Number(x.value)||0)),0);
+ if(used>max){
+   let excess=used-max;
+   for(let i=inputs.length-1;i>=0&&excess;i--){
+     const v=Math.max(0,Math.floor(Number(inputs[i].value)||0)),take=Math.min(v,excess);
+     inputs[i].value=v-take; excess-=take;
+   }
+   used=max;
+ }
+ document.getElementById("swUsedPoints").textContent=used;
+ document.getElementById("swMaxPoints").textContent=max;
  updateSupportPreview();
+}
+function collectSupportEffects(){
+ return [...document.querySelectorAll("#supportEffectEditor [data-effect-id]")].map(row=>({
+   effectId:row.dataset.effectId,
+   points:Math.max(0,Math.floor(Number(row.querySelector(".effectPoints")?.value)||0)),
+   stat:row.querySelector(".effectStat")?.value||null
+ })).filter(e=>e.points>0);
 }
 function updateSupportPreview(){
  const box=document.getElementById("supportPreview"); if(!box)return;
- const [typeId,markId]=(document.getElementById("swType")?.value||"moon|full").split("|");
  const rarity=document.getElementById("swRarity")?.value||"R";
- const effect=document.getElementById("swEffect")?.value||"cap";
- const stat=document.getElementById("swStat")?.value||"";
- const trigger=document.getElementById("swTrigger")?.value||"normal";
- const units=Number(document.getElementById("swUnits")?.value||1);
- const fake={typeId,markId,rarity,effectId:effect,stat,triggerId:trigger,units};
- const tr=supportTriggerDef(trigger);
- box.innerHTML=`<b>プレビュー</b><br>${supportRarityDef(rarity).name} / ${supportTypeName(fake)} / ${supportUnitLabel(fake)}<br>固有スキル：${tr.name} / ${tr.units}/36（${tr.parts===2?"この場合は2つの効果を各3/36で発動":""}）<br>選択効果量：${supportEffectValue(fake)}${supportEffectDef(effect).unit}`;
+ const [typeId,markId]=(document.getElementById("swType")?.value||"moon|full").split("|");
+ const fake={rarity,typeId,markId,effects:collectSupportEffects()};
+ const lines=fake.effects.map(e=>{
+   const d=supportEffectDef(e.effectId),v=supportEffectValue(fake,e);
+   return `${supportEffectLabel(e)}：${Number.isInteger(v)?v:v.toFixed(2)}${d.unit}`;
+ });
+ box.innerHTML=`<b>プレビュー</b><br>${supportRarityDef(rarity).name} / ${supportTypeName(fake)}<br>${lines.length?lines.join("<br>"):"固有能力なし"}`;
 }
 function createSupportCard(){
  normalizeSupport();
+ const rarity=document.getElementById("swRarity")?.value||"R";
+ const total=SUPPORT_RARITY_POINTS[rarity], effects=collectSupportEffects();
+ const used=effects.reduce((a,e)=>a+e.points,0);
+ if(used!==total){alert(`制作ポイントを${total}Pちょうど配分してください。現在${used}Pです。`);return}
  const [typeId,markId]=(document.getElementById("swType")?.value||"moon|full").split("|");
- const card={
-   id:"card-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8),
-   typeId,markId,
-   rarity:document.getElementById("swRarity")?.value||"R",
-   effectId:document.getElementById("swEffect")?.value||"cap",
-   stat:document.getElementById("swStat")?.value||null,
-   triggerId:document.getElementById("swTrigger")?.value||"normal",
-   units:Number(document.getElementById("swUnits")?.value||1),
-   createdAt:Date.now()
- };
- if(["cap","rate","growth","history","stat"].includes(card.effectId)&&!card.stat){
-   alert("この固有効果には対象ステータスを選択してください。");return;
- }
- card.code=makeSupportCode();
- G.supportCards.push(card);
- saveGame();render();
- alert(`カードを保存しました。\n\n${supportRarityDef(card.rarity).name} / ${supportTypeName(card)}\n${supportCardText(card)}\nコード：${card.code}`);
+ const card={id:"card-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8),typeId,markId,rarity,effects,code:makeSupportCode(),createdAt:Date.now()};
+ G.supportCards.push(card);saveGame();render();
+ alert(`カードを保存しました。\n\n${rarity} / ${supportTypeName(card)}\n${effects.map(e=>supportEffectLabel(e)+":"+supportEffectValue(card,e)+supportEffectDef(e.effectId).unit).join("\n")}\nコード：${card.code}`);
 }
 window.createSupportCard=createSupportCard;
 window.openSupportWorkshop=openSupportWorkshop;
@@ -677,7 +689,7 @@ function resetGameData(){
   weights:{攻撃力:20,防御力:20,最大体力:20,素早さ:20,知力:20},
   max:{攻撃力:1,防御力:1,最大体力:1,素早さ:1,知力:1}
  };
- try{localStorage.removeItem("idleGrowthGameSaveV34");localStorage.removeItem("idleGrowthGameSaveV36")}catch(e){}
+ try{localStorage.removeItem("idleGrowthGameSaveV34");localStorage.removeItem("idleGrowthGameSaveV37")}catch(e){}
  normalizeMarks();
  normalizeUsedCodes();
 }
@@ -965,12 +977,12 @@ function formatDuration(sec){
 function saveGame(){
  try{
   G.offlineAt=G.offlineAt||Date.now();
-  localStorage.setItem("idleGrowthGameSaveV36",JSON.stringify(G));
+  localStorage.setItem("idleGrowthGameSaveV37",JSON.stringify(G));
  }catch(e){console.warn("save failed",e)}
 }
 function loadGame(){
  try{
-  const raw=localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
+  const raw=localStorage.getItem("idleGrowthGameSaveV37")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
   if(raw){
    const saved=JSON.parse(raw);
    if(saved&&typeof saved==="object") Object.assign(G,saved);
