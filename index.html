@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Idle Growth Game v25</title>
+<title>Idle Growth Game v39</title>
 <style>
 body{margin:0;background:#0b1118;color:#eef3f8;font-family:system-ui,sans-serif}
 .wrap{max-width:1100px;margin:auto;padding:18px}h1{margin:0 0 4px}
@@ -88,7 +88,7 @@ button:hover{background:#2b3b4d}button:disabled{opacity:.45;cursor:not-allowed}
 </head>
 <body>
 <div class="wrap">
-<h1>Idle Growth Game v38</h1>
+<h1>Idle Growth Game v39</h1>
 <div class="muted">マップ15まで実装・エリアボス撃破で次マップ解放</div>
 
 <div class="tabs">
@@ -151,9 +151,8 @@ button:hover{background:#2b3b4d}button:disabled{opacity:.45;cursor:not-allowed}
 <h3>所持カード</h3>
 <div id="supportInventory" class="cards"></div>
 </div>
-<div class="panel">
-<h3>サポートカード制作</h3>
-<p class="muted">コード「88224646ば」を入力し、コード使用ボタンを長押しすると制作室が開きます。制作室ではカードの内容をすべて選択できます。</p>
+<div class="panel" id="supportWorkshopPanel" style="display:none">
+<h3>サポートカード制作室</h3>
 <div id="supportWorkshop"></div>
 </div>
 </section>
@@ -190,7 +189,7 @@ button:hover{background:#2b3b4d}button:disabled{opacity:.45;cursor:not-allowed}
 <section id="codes" class="page hidden">
   <div class="panel">
     <h2>コード入力</h2>
-    <p class="muted">コードはそれぞれ1回だけ使用できます。入力後は効果が即時反映されます。<br><b>ヒント：チートコード＝好きな食べ物</b></p>
+    <p class="muted">コードはそれぞれ1回だけ使用できます。入力後は効果が即時反映されます。</p>
     <div class="row">
       <input id="codeInput" type="text" placeholder="コードを入力" autocomplete="off">
       <button id="redeemCodeBtn" class="longPressButton">コードを使用</button>
@@ -502,6 +501,8 @@ function supportCardText(card){
  return supportUnitLabel(card);
 }
 function openSupportWorkshop(){
+ const panel=document.getElementById("supportWorkshopPanel");
+ if(panel)panel.style.display="block";
  const box=document.getElementById("supportWorkshop"); if(!box)return;
  const rarities=SUPPORT_RARITIES.map(x=>`<option value="${x.id}">${x.name}（制作ポイント ${SUPPORT_RARITY_POINTS[x.id]}P / 効果×${x.mult}）</option>`).join("");
  const types=SUPPORT_TYPES.map(t=>`<optgroup label="${t.name}">${t.marks.map(m=>`<option value="${t.id}|${m.id}">${t.name}：${m.name} — ${m.desc}</option>`).join("")}</optgroup>`).join("");
@@ -633,7 +634,7 @@ function renderSupport(){
    </div>`;
  }).join(""):"<p class=\"muted\">まだサポートカードがありません。</p>";
  const workshop=document.getElementById("supportWorkshop");
- if(workshop&&!workshop.innerHTML.trim())workshop.innerHTML=`<p class="muted">コード入力画面で「88224646ば」を入力し、「コードを使用」を長押しすると制作室が解放されます。</p>`;
+ if(workshop&&!workshop.innerHTML.trim())workshop.innerHTML="";
 }
 window.equipSupport=function(id){
  normalizeSupport();
@@ -658,7 +659,7 @@ const SECRET_CODES={
 
  "88224646ば":{
    label:"サポートカード制作室",
-   message:"サポートカード制作室を開きました。",
+   message:"隠し制作室を開きました。",
    workshop:true,
    run(){ unlockSupportWorkshop(); }
  },
@@ -1011,12 +1012,13 @@ function formatDuration(sec){
 function saveGame(){
  try{
   G.offlineAt=G.offlineAt||Date.now();
+  localStorage.setItem("idleGrowthGameSaveV39",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV38",JSON.stringify(G));
  }catch(e){console.warn("save failed",e)}
 }
 function loadGame(){
  try{
-  const raw=localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
+  const raw=localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
   if(raw){
    const saved=JSON.parse(raw);
    if(saved&&typeof saved==="object") Object.assign(G,saved);
