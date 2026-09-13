@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Idle Growth Game v43</title>
+<title>Idle Growth Game v44</title>
 <style>
 body{margin:0;background:#0b1118;color:#eef3f8;font-family:system-ui,sans-serif}
 .wrap{max-width:1100px;margin:auto;padding:18px}h1{margin:0 0 4px}
@@ -1050,7 +1050,8 @@ function fight(){
  const map=MAPS[G.map],m=pickEnemy(map),base=stats(),cards=equippedSupportCards(),log=[];let p={...base},hp=p.最大体力,ehp=m.hp,shield=0,damaged=false,pspd=p.素早さ;
  const sea=supportTypeHas("海"),noon=supportTypeHas("真昼"),sunset=supportTypeHas("夕焼け"),sky=supportTypeHas("空"),mountain=supportTypeHas("山脈"),continent=supportTypeHas("大陸");
  const waxing=supportTypeCards("上弦の月").length,waning=supportTypeCards("下弦の月").length,newMoon=supportTypeCards("新月").length,regenGuard=cards.some(c=>c.triggerId==="regen_guard");
- const seaExtra=sea?Math.min(.5,Math.max(0,(enemyRank(m)-rank())/Math.max(1,rank()))*.5):0;
+ const playerRank=rank(),enemyR=enemyRank(m);
+ const seaExtra=sea?Math.min(.5,Math.max(0,(enemyR-playerRank)/Math.max(1,playerRank))*.5):0;
  if(waxing)shield=p.最大体力*.03*waxing;
  const pa=Math.max(1,Math.floor((pspd*(noon?1.03:1))/30)),ea=Math.max(1,Math.floor(m.spd/30));
  log.push(["draw",`【遭遇】${m.name} と遭遇！ / Lv.${m.level} / 強さ指数 ${Number(m.power).toLocaleString()}%`]);if(shield)log.push(["player",`【上弦の月】シールド ${shield.toFixed(1)} を展開`]);
@@ -1074,7 +1075,7 @@ function fight(){
    if(regenGuard&&hp>0){const missing=Math.max(0,p.最大体力-hp),heal=missing*.005*(1+supportGenericSum("heal")/100);if(heal>0){hp=Math.min(p.最大体力,hp+heal);log.push(["player",`【固有スキル】HP +${heal.toFixed(2)}`])}}
   }
   if(hp<=0||ehp<=0){
-   if(hp>0&&ehp<=0){let ex=battleExp(p,m,hp);if(mountain)ex=Math.floor(ex*1.01);gainExp(ex);const bb=supportGenericSum("battle");if(bb>0){const rs=ST[Math.floor(Math.random()*ST.length)],amt=Math.random()*G.max[rs]*(1+bb/100);G.base[rs]+=amt;log.push(["win",`【戦闘ボーナス】${rs} +${amt.toFixed(2)} 成長`])}let gold=m.gold*(mountain?1.01:1),items=1*(1+supportGenericSum("item")/100);if(continent)items*=1+Math.min(.1,Math.max(0,hp/p.最大体力)*.1);G.gold+=Math.floor(gold);G.items+=Math.max(1,Math.floor(items));log.push(["win",`【勝利】 EXP +${gotExp} / Gold +${Math.floor(gold)} / Item +${Math.max(1,Math.floor(items))}`]);if(m.boss&&!m.nushi&&G.map===G.highest&&G.map<MAPS.length-1){G.highest=G.map+1;log.push(["win",`【エリアボス撃破】${MAPS[G.map+1].name} が解放されました！`])}else if(G.map>G.highest){G.highest=G.map;log.push(["win",`【新記録】最高クリア：${map.name}`])}}
+   if(hp>0&&ehp<=0){let ex=battleExp(p,m,hp);if(mountain)ex=Math.floor(ex*1.01);gainExp(ex);const bb=supportGenericSum("battle");if(bb>0){const rs=ST[Math.floor(Math.random()*ST.length)],amt=Math.random()*G.max[rs]*(1+bb/100);G.base[rs]+=amt;log.push(["win",`【戦闘ボーナス】${rs} +${amt.toFixed(2)} 成長`])}let gold=m.gold*(mountain?1.01:1),items=1*(1+supportGenericSum("item")/100);if(continent)items*=1+Math.min(.1,Math.max(0,hp/p.最大体力)*.1);G.gold+=Math.floor(gold);G.items+=Math.max(1,Math.floor(items));log.push(["win",`【勝利】 EXP +${ex} / Gold +${Math.floor(gold)} / Item +${Math.max(1,Math.floor(items))}`]);if(m.boss&&!m.nushi&&G.map===G.highest&&G.map<MAPS.length-1){G.highest=G.map+1;log.push(["win",`【エリアボス撃破】${MAPS[G.map+1].name} が解放されました！`])}else if(G.map>G.highest){G.highest=G.map;log.push(["win",`【新記録】最高クリア：${map.name}`])}}
    else if(hp<=0&&ehp>0)log.push(["lose","【敗北】"]);else log.push(["draw","【相打ち】同一ターン内で両者死亡"]);break;
   }
  }
@@ -1125,6 +1126,7 @@ function formatDuration(sec){
 function saveGame(){
  try{
   G.offlineAt=G.offlineAt||Date.now();
+  localStorage.setItem("idleGrowthGameSaveV44",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV43",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV42",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV41",JSON.stringify(G));
@@ -1135,7 +1137,7 @@ function saveGame(){
 }
 function loadGame(){
  try{
-  const raw=localStorage.getItem("idleGrowthGameSaveV43")||localStorage.getItem("idleGrowthGameSaveV42")||localStorage.getItem("idleGrowthGameSaveV41")||localStorage.getItem("idleGrowthGameSaveV40")||localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
+  const raw=localStorage.getItem("idleGrowthGameSaveV44")||localStorage.getItem("idleGrowthGameSaveV43")||localStorage.getItem("idleGrowthGameSaveV42")||localStorage.getItem("idleGrowthGameSaveV41")||localStorage.getItem("idleGrowthGameSaveV40")||localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
   if(raw){
    const saved=JSON.parse(raw);
    if(saved&&typeof saved==="object") Object.assign(G,saved);
