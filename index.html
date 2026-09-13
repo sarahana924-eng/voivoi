@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Idle Growth Game v39</title>
+<title>Idle Growth Game v42</title>
 <style>
 body{margin:0;background:#0b1118;color:#eef3f8;font-family:system-ui,sans-serif}
 .wrap{max-width:1100px;margin:auto;padding:18px}h1{margin:0 0 4px}
@@ -124,7 +124,7 @@ button:hover{background:#2b3b4d}button:disabled{opacity:.45;cursor:not-allowed}
 <section id="battle" class="page hidden">
 <div class="grid">
 <div class="panel"><h2>マップ</h2><div id="maps" class="cards"></div></div>
-<div class="panel"><h2>戦闘</h2><div id="battleInfo"></div><div class="notice">マップを選択して冒険できます。エリアボスを撃破すると次のマップが解放されます。<br>新EXP = 10 + (100 − 等級差) × 相手Lv + お互いの賢さ。プレイヤーの強さ指数が敵より低い場合は最終EXPを15%増加。5未満は5。</div><button id="battleBtn">バトル開始</button><div style="margin-top:10px"><h3 style="margin:6px 0">バトルログ</h3><div id="log" class="log">戦闘するとここに表示されます。</div></div></div>
+<div class="panel"><h2>戦闘</h2><div id="battleInfo"></div><div class="notice">マップを選択して冒険できます。戦闘では等級が高い側が先制しやすくなります。エリアボスを撃破すると次のマップが解放されます。<br>新EXP = 10 + (100 − 等級差) × 相手Lv + お互いの賢さ。プレイヤーの強さ指数が敵より低い場合は最終EXPを15%増加。5未満は5。</div><button id="battleBtn">バトル開始</button><div style="margin-top:10px"><h3 style="margin:6px 0">バトルログ</h3><div id="log" class="log">戦闘するとここに表示されます。</div></div></div>
 </div>
 </section>
 
@@ -151,6 +151,11 @@ button:hover{background:#2b3b4d}button:disabled{opacity:.45;cursor:not-allowed}
 <h3>所持カード</h3>
 <div id="supportInventory" class="cards"></div>
 </div>
+<div class="panel">
+<h3>天星タイプ相性</h3>
+<p class="muted">横列＝そのサポカ、縦列＝同時にセットしている他のサポカ。◎ +3%、〇 +1%、‐ 0%、△ -1%。合計がそのカードの固有効果量に反映されます。</p>
+<div id="supportCompatibilityTable" style="overflow:auto"></div>
+</div>
 <div class="panel" id="supportWorkshopPanel" style="display:none">
 <h3>サポートカード制作室</h3>
 <div id="supportWorkshop"></div>
@@ -167,7 +172,8 @@ button:hover{background:#2b3b4d}button:disabled{opacity:.45;cursor:not-allowed}
 </section>
 
 <section id="gacha" class="page hidden">
-<div class="panel"><h2>ガチャ</h2><p>1000 Goldでランダムなステータスが1～3上昇。</p><button id="gachaBtn">1000 Goldで引く</button><p id="gachaResult"></p></div>
+<div class="panel"><h2>ガチャ</h2><p>1000 Goldでランダムなステータスが1～3上昇。</p><button id="gachaHalfBtn" type="button">一括で引く（所持金の半分）</button>
+<button id="gachaBtn">1000 Goldで引く</button><p id="gachaResult"></p></div>
 </section>
 </div>
 
@@ -408,34 +414,70 @@ const SUPPORT_TYPES=[
  ]}
 ];
 const SUPPORT_EFFECTS=[
- {id:"cap",name:"上限値アップ",unit:"",desc:"そのステータスの上限値がセット中だけ上がる。"},
- {id:"rate",name:"得意率アップ",unit:"",desc:"そのステータスが成長抽選で選ばれやすくなる。"},
- {id:"growth",name:"成長率アップ",unit:"%",desc:"そのステータスが選ばれたとき少し成長しやすくなる。"},
- {id:"heal",name:"回復量アップ",unit:"%",desc:"回復量が少し上がる。"},
- {id:"battle",name:"戦闘ボーナス",unit:"%",desc:"戦闘終了時に成長を一度だけ行い、その増加量が増える。"},
- {id:"mind",name:"心得ポイントボーナス",unit:"P",desc:"心得ポイントのもらえる量が増える。"},
- {id:"gacha",name:"ガチャステータスボーナス",unit:"%",desc:"ガチャでもらえるステータスが少し増える。"},
- {id:"item",name:"アイテムボーナス",unit:"%",desc:"アイテムが少し増えたりする。"},
- {id:"exp",name:"経験値ボーナス",unit:"%",desc:"経験値が少し増える。"},
- {id:"history",name:"歴戦ボーナス",unit:"%",desc:"そのステータスがレベルアップするとき増加する。"},
- {id:"stat",name:"ボーナス",unit:"",desc:"成長時そのステータスが追加で上がるようになる。"}
+{id:"cap_atk",name:"攻撃力上限値アップ",unit:"",desc:"攻撃力の上限値がセット中だけ上がる。",stat:"攻撃力"},
+{id:"cap_def",name:"防御力上限値アップ",unit:"",desc:"防御力の上限値がセット中だけ上がる。",stat:"防御力"},
+{id:"cap_hp",name:"最大体力上限値アップ",unit:"",desc:"最大体力の上限値がセット中だけ上がる。",stat:"最大体力"},
+{id:"cap_spd",name:"素早さ上限値アップ",unit:"",desc:"素早さの上限値がセット中だけ上がる。",stat:"素早さ"},
+{id:"cap_int",name:"知力上限値アップ",unit:"",desc:"知力の上限値がセット中だけ上がる。",stat:"知力"},
+{id:"rate_atk",name:"攻撃力得意率アップ",unit:"%",desc:"攻撃力が成長抽選で選ばれやすくなる。",stat:"攻撃力"},
+{id:"rate_def",name:"防御力得意率アップ",unit:"%",desc:"防御力が成長抽選で選ばれやすくなる。",stat:"防御力"},
+{id:"rate_hp",name:"最大体力得意率アップ",unit:"%",desc:"最大体力が成長抽選で選ばれやすくなる。",stat:"最大体力"},
+{id:"rate_spd",name:"素早さ得意率アップ",unit:"%",desc:"素早さが成長抽選で選ばれやすくなる。",stat:"素早さ"},
+{id:"rate_int",name:"知力得意率アップ",unit:"%",desc:"知力が成長抽選で選ばれやすくなる。",stat:"知力"},
+{id:"growth_atk",name:"攻撃力成長率アップ",unit:"%",desc:"攻撃力が選ばれたとき成長しやすくなる。",stat:"攻撃力"},
+{id:"growth_def",name:"防御力成長率アップ",unit:"%",desc:"防御力が選ばれたとき成長しやすくなる。",stat:"防御力"},
+{id:"growth_hp",name:"最大体力成長率アップ",unit:"%",desc:"最大体力が選ばれたとき成長しやすくなる。",stat:"最大体力"},
+{id:"growth_spd",name:"素早さ成長率アップ",unit:"%",desc:"素早さが選ばれたとき成長しやすくなる。",stat:"素早さ"},
+{id:"growth_int",name:"知力成長率アップ",unit:"%",desc:"知力が選ばれたとき成長しやすくなる。",stat:"知力"},
+{id:"heal",name:"回復量アップ",unit:"%",desc:"回復量が少し上がる。"},
+{id:"battle",name:"戦闘ボーナス",unit:"%",desc:"戦闘終了時に成長を一度だけ行い、その増加量が増える。"},
+{id:"mind",name:"心得ポイントボーナス",unit:"P",desc:"心得ポイントのもらえる量が増える。"},
+{id:"gacha",name:"ガチャステータスボーナス",unit:"%",desc:"ガチャでもらえるステータスが少し増える。"},
+{id:"item",name:"アイテムボーナス",unit:"%",desc:"アイテムが少し増える。"},
+{id:"exp",name:"経験値ボーナス",unit:"%",desc:"経験値が少し増える。"},
+{id:"history_atk",name:"攻撃力歴戦ボーナス",unit:"%",desc:"攻撃力がレベルアップ時に増加する。",stat:"攻撃力"},
+{id:"history_def",name:"防御力歴戦ボーナス",unit:"%",desc:"防御力がレベルアップ時に増加する。",stat:"防御力"},
+{id:"history_hp",name:"最大体力歴戦ボーナス",unit:"%",desc:"最大体力がレベルアップ時に増加する。",stat:"最大体力"},
+{id:"history_spd",name:"素早さ歴戦ボーナス",unit:"%",desc:"素早さがレベルアップ時に増加する。",stat:"素早さ"},
+{id:"history_int",name:"知力歴戦ボーナス",unit:"%",desc:"知力がレベルアップ時に増加する。",stat:"知力"},
+{id:"stat_atk",name:"攻撃力ボーナス",unit:"",desc:"成長時、攻撃力が追加で上がる。",stat:"攻撃力"},
+{id:"stat_def",name:"防御力ボーナス",unit:"",desc:"成長時、防御力が追加で上がる。",stat:"防御力"},
+{id:"stat_hp",name:"最大体力ボーナス",unit:"",desc:"成長時、最大体力が追加で上がる。",stat:"最大体力"},
+{id:"stat_spd",name:"素早さボーナス",unit:"",desc:"成長時、素早さが追加で上がる。",stat:"素早さ"},
+{id:"stat_int",name:"知力ボーナス",unit:"",desc:"成長時、知力が追加で上がる。",stat:"知力"}
 ];
 const SUPPORT_TRIGGERS=[
- {id:"hp80",name:"HP80%以上",parts:1,units:7},
- {id:"hp70",name:"HP70%以上",parts:2,units:3},
- {id:"hp60",name:"HP60%以上",parts:1,units:5},
- {id:"normal",name:"通常",parts:1,units:1}
+{id:"hp80",name:"HP80%以上",parts:1,units:7},
+{id:"hp70",name:"HP70%以上",parts:2,units:3},
+{id:"hp60",name:"HP60%以上",parts:1,units:5},
+{id:"normal",name:"通常",parts:1,units:1},
+{id:"regen_guard",name:"行動するたび回復＋HP50%未満で防御",parts:1,units:1,desc:"戦闘中、お互いが動くたびに減少体力の0.5%を回復。残り体力が50%未満なら防御力+5%。"}
 ];
 const SUPPORT_RARITIES=[
- {id:"R",name:"R",chance:80,mult:1},
- {id:"SR",name:"SR",chance:19,mult:1.44},
- {id:"SSR",name:"SSR",chance:1,mult:1.96}
+{id:"R",name:"R",chance:80,mult:1},
+{id:"SR",name:"SR",chance:19,mult:1.44},
+{id:"SSR",name:"SSR",chance:1,mult:1.96}
 ];
 const SUPPORT_STAT_EFFECTS=["攻撃力","防御力","最大体力","素早さ","知力"];
 const SUPPORT_MAX_UNITS=36;
 const SUPPORT_RARITY_POINTS={R:30,SR:45,SSR:60};
 const SUPPORT_STATS=["攻撃力","防御力","最大体力","素早さ","知力"];
-const SUPPORT_EFFECT_IDS=["cap","rate","growth","heal","battle","mind","gacha","item","exp","history","stat"];
+const SUPPORT_EFFECT_IDS=SUPPORT_EFFECTS.map(x=>x.id);
+const SUPPORT_MARKS=["満月","上弦の月","下弦の月","新月","空","山脈","大陸","海","朝日","真昼","夕焼け","深夜"];
+const SUPPORT_COMPAT=[
+["〇","◎","△","〇","〇","〇","◎","‐","△","‐","〇","〇"],
+["〇","〇","‐","〇","△","〇","△","◎","〇","△","△","〇"],
+["〇","‐","〇","〇","△","〇","〇","‐","〇","◎","〇","〇"],
+["〇","〇","〇","〇","◎","〇","〇","‐","〇","〇","〇","〇"],
+["〇","△","△","◎","〇","〇","△","‐","〇","〇","〇","〇"],
+["〇","〇","〇","〇","〇","〇","〇","〇","△","〇","◎","‐"],
+["◎","△","〇","〇","△","〇","〇","〇","〇","〇","〇","〇"],
+["‐","◎","‐","‐","‐","〇","〇","〇","△","△","〇","〇"],
+["△","〇","〇","〇","〇","△","〇","△","〇","〇","〇","◎"],
+["‐","△","◎","〇","〇","〇","〇","△","〇","〇","〇","〇"],
+["〇","△","〇","〇","〇","◎","〇","〇","〇","〇","〇","〇"],
+["〇","〇","〇","〇","〇","‐","〇","〇","◎","〇","〇","〇"]
+];
 function supportSlots(){
  const r=Math.max(0,Math.floor(Number(G.rebirth)||0));
  const fixed=[0,5,15,30,50,75,105,140,180,225,275,330,390,455,525,600,680,765,855,950];
@@ -447,47 +489,34 @@ function supportFinalMultiplier(cardId){
  const equipped=(G.supportEquipped||[]).filter(id=>id===cardId).length;
  return 1+Math.min(6,Math.max(0,equipped-1))*0.05;
 }
+function legacyEffectId(id,stat){
+ const m={cap:"cap_",rate:"rate_",growth:"growth_",history:"history_",stat:"stat_"};
+ const s={攻撃力:"atk",防御力:"def",最大体力:"hp",素早さ:"spd",知力:"int"};
+ return m[id]?m[id]+(s[stat]||"atk"):id;
+}
 function normalizeSupport(){
  if(!Array.isArray(G.supportCards))G.supportCards=[];
  if(!Array.isArray(G.supportEquipped))G.supportEquipped=[];
  G.supportCards=G.supportCards.filter(c=>c&&typeof c==="object").map((c,i)=>{
-   const rarity=SUPPORT_RARITIES.some(r=>r.id===c.rarity)?c.rarity:"R";
-   const type=SUPPORT_TYPES.find(t=>t.id===c.typeId)||SUPPORT_TYPES[0];
-   const mark=type.marks.find(m=>m.id===c.markId)||type.marks[0];
-   let effects=Array.isArray(c.effects)?c.effects:[];
-   if(!effects.length && c.effectId){
-     effects=[{effectId:c.effectId,points:Math.max(1,Math.floor(Number(c.units)||1)),enabled:true,stat:c.stat||null}];
-   }
-   effects=effects.filter(e=>SUPPORT_EFFECTS.some(d=>d.id===e.effectId)).map(e=>({
-     effectId:e.effectId,
-     points:Math.max(0,Math.floor(Number(e.points)||0)),
-     enabled:e.enabled!==false,
-     stat:e.stat&&SUPPORT_STATS.includes(e.stat)?e.stat:null
-   })).filter(e=>e.points>0);
-   const total=SUPPORT_RARITY_POINTS[rarity];
-   let sum=effects.reduce((a,e)=>a+e.points,0);
-   if(!effects.length)effects=[{effectId:"growth",points:total,enabled:true,stat:SUPPORT_STATS[0]}],sum=total;
-   if(sum!==total){
-     if(sum<total)effects[0].points+=total-sum;
-     else{
-       let excess=sum-total;
-       for(let j=effects.length-1;j>=0&&excess>0;j--){
-         const take=Math.min(excess,effects[j].points);
-         effects[j].points-=take;excess-=take;
-       }
-       effects=effects.filter(e=>e.points>0);
-     }
-   }
-   return {
-     id:c.id||("card-"+Date.now().toString(36)+"-"+i),
-     typeId:type.id,markId:mark.id,rarity,effects,
-     triggerId:SUPPORT_TRIGGERS.some(t=>t.id===c.triggerId)?c.triggerId:"normal",
-     code:c.code||makeSupportCode(),createdAt:Number(c.createdAt)||Date.now()
-   };
+  const rarity=SUPPORT_RARITIES.some(r=>r.id===c.rarity)?c.rarity:"R";
+  const type=SUPPORT_TYPES.find(t=>t.id===c.typeId)||SUPPORT_TYPES[0];
+  const mark=type.marks.find(m=>m.id===c.markId)||type.marks[0];
+  let effects=Array.isArray(c.effects)?c.effects:[];
+  if(!effects.length&&c.effectId)effects=[{effectId:c.effectId,points:Math.max(1,Math.floor(Number(c.units)||1)),enabled:true,stat:c.stat||"攻撃力"}];
+  effects=effects.map(e=>({...e,effectId:legacyEffectId(e.effectId,e.stat)}))
+   .filter(e=>SUPPORT_EFFECTS.some(d=>d.id===e.effectId))
+   .map(e=>({effectId:e.effectId,points:Math.max(0,Math.floor(Number(e.points)||0)),enabled:e.enabled!==false,stat:SUPPORT_EFFECTS.find(d=>d.id===e.effectId)?.stat||null}))
+   .filter(e=>e.points>0);
+  const total=SUPPORT_RARITY_POINTS[rarity];let sum=effects.reduce((a,e)=>a+e.points,0);
+  if(!effects.length)effects=[{effectId:"growth_atk",points:total,enabled:true,stat:"攻撃力"}],sum=total;
+  if(sum!==total){
+   if(sum<total)effects[0].points+=total-sum;
+   else{let ex=sum-total;for(let j=effects.length-1;j>=0&&ex>0;j--){let take=Math.min(ex,effects[j].points);effects[j].points-=take;ex-=take}effects=effects.filter(e=>e.points>0)}
+  }
+  return {id:c.id||("card-"+Date.now().toString(36)+"-"+i),typeId:type.id,markId:mark.id,rarity,effects,triggerId:SUPPORT_TRIGGERS.some(t=>t.id===c.triggerId)?c.triggerId:"normal",code:c.code||makeSupportCode(),createdAt:Number(c.createdAt)||Date.now()};
  });
  G.supportEquipped=G.supportEquipped.map(id=>G.supportCards.some(c=>c.id===id)?id:null);
- const slots=supportSlots();
- if(G.supportEquipped.length>slots)G.supportEquipped=G.supportEquipped.slice(0,slots);
+ const slots=supportSlots();if(G.supportEquipped.length>slots)G.supportEquipped=G.supportEquipped.slice(0,slots);
  while(G.supportEquipped.length<slots)G.supportEquipped.push(null);
 }
 function supportStoredEffects(card){
@@ -500,37 +529,31 @@ function supportEffectiveEffectsForCard(card){
   return active.filter(e=>(Number(e.points)||0)>0).map(e=>({...e,points:(Number(e.points)||0)+bonus}));
 }
 
-function supportEffectBaseValue(effectId,points){
- const p=Math.max(0,Number(points)||0);
- if(effectId==="cap") return p*10;
- if(effectId==="rate") return p*2;
- if(effectId==="growth") return p*1;
- if(effectId==="heal") return p*1;
- if(effectId==="battle") return p*1;
- if(effectId==="mind") return p;
- if(effectId==="gacha") return p*1;
- if(effectId==="item") return p*1;
- if(effectId==="exp") return p*1;
- if(effectId==="history") return p*1;
- if(effectId==="stat") return p;
- return p;
+function equippedSupportCards(){normalizeSupport();return G.supportEquipped.map(id=>G.supportCards.find(c=>c.id===id)).filter(Boolean)}
+function supportMarkIndex(card){const t=SUPPORT_TYPES.find(x=>x.id===card.typeId);return SUPPORT_MARKS.indexOf(t?.marks.find(m=>m.id===card.markId)?.name||"")}
+function supportCompatibilityPercent(card){
+ const all=equippedSupportCards(),ri=supportMarkIndex(card);if(ri<0)return 0;let total=0,skippedSelf=false;
+ all.forEach(other=>{if(other===card&&!skippedSelf){skippedSelf=true;return}const ci=supportMarkIndex(other);if(ci<0)return;const v=SUPPORT_COMPAT[ri][ci];total+=v==="◎"?3:v==="〇"?1:v==="△"?-1:0});
+ return total;
 }
+function supportTypePassiveMultiplier(card){const t=SUPPORT_TYPES.find(x=>x.id===card.typeId),m=t?.marks.find(x=>x.id===card.markId);return m?.name==="満月"?1.15:1}
+function supportCardPowerMultiplier(card){return (1+supportCompatibilityPercent(card)/100)*supportTypePassiveMultiplier(card)*supportFinalMultiplier(card.id)}
+function supportEffectBaseValue(id,p){p=Math.max(0,Number(p)||0);return id.startsWith("cap_")?p*10:id.startsWith("rate_")?p*2:p}
 function supportPointsTotal(card){return (card.effects||[]).reduce((a,e)=>a+(Number(e.points)||0),0)}
 function supportEffectValue(card,e){
- const rarity=supportRarityDef(card.rarity);
- let points=Number(e.points)||0;
- const active=(card.effects||[]).filter(x=>x.enabled!==false);
- const off=(card.effects||[]).filter(x=>x.enabled===false).reduce((a,x)=>a+(Number(x.points)||0),0);
- if(e.enabled===false)return 0;
- if(active.length)points+=off/active.length;
- return supportEffectBaseValue(e.effectId,points)*rarity.mult;
+ const r=supportRarityDef(card.rarity),active=(card.effects||[]).filter(x=>x.enabled!==false),off=(card.effects||[]).filter(x=>x.enabled===false).reduce((a,x)=>a+(Number(x.points)||0),0);
+ if(e.enabled===false)return 0;let p=Number(e.points)||0;if(active.length)p+=off/active.length;
+ return supportEffectBaseValue(e.effectId,p)*r.mult*supportCardPowerMultiplier(card);
 }
-function supportEffectLabel(e){
- const d=supportEffectDef(e.effectId);
- return d.name+(e.stat?`（${e.stat}）`:"");
+function supportEffectLabel(e){return supportEffectDef(e.effectId).name}
+function supportActiveEffectSum(prefix,stat){
+ let total=0;equippedSupportCards().forEach(card=>supportEffectiveEffectsForCard(card).forEach(e=>{const d=supportEffectDef(e.effectId);if((e.effectId||"").startsWith(prefix+"_")&&d.stat===stat)total+=supportEffectValue(card,e)}));return total;
 }
-
-
+function supportGenericSum(id){
+ let total=0;equippedSupportCards().forEach(card=>supportEffectiveEffectsForCard(card).forEach(e=>{if(e.effectId===id)total+=supportEffectValue(card,e)}));return total;
+}
+function supportTypeHas(name){return equippedSupportCards().some(card=>{const t=SUPPORT_TYPES.find(x=>x.id===card.typeId),m=t?.marks.find(x=>x.id===card.markId);return m?.name===name})}
+function supportTypeCards(name){return equippedSupportCards().filter(card=>{const t=SUPPORT_TYPES.find(x=>x.id===card.typeId),m=t?.marks.find(x=>x.id===card.markId);return m?.name===name})}
 function supportTypeName(card){
  const t=SUPPORT_TYPES.find(x=>x.id===card.typeId);
  const m=t?.marks.find(x=>x.id===card.markId);
@@ -545,14 +568,12 @@ function supportUnitLabel(card){
  return e.name+(card.stat?`（${card.stat}）`:"");
 }
 function supportCardText(card){
- if(Array.isArray(card.effects)){
-   return card.effects.map(e=>{
-     const d=supportEffectDef(e.effectId), v=supportEffectValue(card,e);
-     const val=Number.isInteger(v)?v:v.toFixed(2);
-     return `${supportEffectLabel(e)}：${val}${d.unit}`;
-   }).join("<br>");
- }
- return supportUnitLabel(card);
+ const lines=[];
+ (card.effects||[]).forEach(e=>{const d=supportEffectDef(e.effectId),v=supportEffectValue(card,e),val=Number.isInteger(v)?v:v.toFixed(2);lines.push(`${supportEffectLabel(e)}：${val}${d.unit}`)});
+ const t=SUPPORT_TYPES.find(x=>x.id===card.typeId),m=t?.marks.find(x=>x.id===card.markId);
+ if(m)lines.push(`<b>天星固有効果</b>：${m.desc}`);
+ lines.push(`相性補正：${supportCompatibilityPercent(card)>=0?"+":""}${supportCompatibilityPercent(card).toFixed(0)}%`);
+ return lines.join("<br>");
 }
 function openSupportWorkshop(){
  const panel=document.getElementById("supportWorkshopPanel");
@@ -578,13 +599,8 @@ function openSupportWorkshop(){
  renderSupportEffectEditor(true);
 }
 function supportEffectRowHTML(id,points,enabled=true){
- const d=supportEffectDef(id), need=["cap","rate","growth","history","stat"].includes(id);
- return `<div class="supportCard" data-effect-id="${id}">
- <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
- <label style="display:flex;flex-direction:row;align-items:center;gap:4px"><input class="effectEnabled" type="checkbox" ${enabled?"checked":""}> ON</label>
- <b>${d.name}</b><input class="effectPoints" type="number" min="0" max="60" value="${points}" style="width:75px"><span>P</span>
- ${need?`<select class="effectStat">${SUPPORT_STATS.map(x=>`<option>${x}</option>`).join("")}</select>`:""}
- </div><small class="muted">${d.desc}</small></div>`;
+ const d=supportEffectDef(id);
+ return `<div class="supportCard" data-effect-id="${id}"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label style="display:flex;flex-direction:row;align-items:center;gap:4px"><input class="effectEnabled" type="checkbox" ${enabled?"checked":""}> ON</label><b>${d.name}</b><input class="effectPoints" type="number" min="0" max="60" value="${points}" style="width:75px"><span>P</span></div><small class="muted">${d.desc}</small></div>`;
 }
 function renderSupportEffectEditor(auto){
  const box=document.getElementById("supportEffectEditor"); if(!box)return;
@@ -602,7 +618,6 @@ function renderSupportEffectEditor(auto){
  box.innerHTML=SUPPORT_EFFECT_IDS.map(id=>supportEffectRowHTML(id,vals[id]||0,ons[id]!==false)).join("");
  box.querySelectorAll(".effectPoints,.effectEnabled").forEach(x=>x.addEventListener("input",updateSupportAllocation));
  box.querySelectorAll(".effectEnabled").forEach(x=>x.addEventListener("change",updateSupportAllocation));
- box.querySelectorAll(".effectStat").forEach(x=>x.addEventListener("change",updateSupportPreview));
  updateSupportAllocation();
 }
 function updateSupportAllocation(){
@@ -631,7 +646,7 @@ function collectSupportRawEffects(){
    effectId:row.dataset.effectId,
    points:Math.max(0,Math.floor(Number(row.querySelector(".effectPoints")?.value)||0)),
    enabled:row.querySelector(".effectEnabled")?.checked!==false,
-   stat:row.querySelector(".effectStat")?.value||null
+   stat:supportEffectDef(row.dataset.effectId).stat||null
  })).filter(e=>e.points>0);
 }
 function collectSupportEffects(){
@@ -666,8 +681,15 @@ function createSupportCard(){
 }
 window.createSupportCard=createSupportCard;
 window.openSupportWorkshop=openSupportWorkshop;
+function renderSupportCompatibilityTable(){
+ const box=document.getElementById("supportCompatibilityTable");if(!box)return;
+ const h=SUPPORT_MARKS.map(x=>`<th style="padding:5px;white-space:nowrap">${x}</th>`).join("");
+ const rows=SUPPORT_MARKS.map((r,i)=>`<tr><th style="padding:5px;white-space:nowrap">${r}</th>${SUPPORT_COMPAT[i].map(v=>`<td style="padding:5px;text-align:center">${v}</td>`).join("")}</tr>`).join("");
+ box.innerHTML=`<table style="border-collapse:collapse;font-size:12px"><thead><tr><th style="padding:5px">横\縦</th>${h}</tr></thead><tbody>${rows}</tbody></table>`;
+}
 function renderSupport(){
  normalizeSupport();
+ renderSupportCompatibilityTable();
  const slots=supportSlots();
  const sc=document.getElementById("supportSlotCount"),oc=document.getElementById("supportOwnedCount");
  if(sc)sc.textContent=slots;
@@ -686,7 +708,7 @@ function renderSupport(){
    const mult=supportFinalMultiplier(c.id);
    return `<div class="supportCard ${equippedAt>=0?"selected":""}">
     <div><span class="supportBadge ${SUPPORT_TYPES.find(t=>t.id===c.typeId)?.className||""}">${supportTypeName(c)}</span><span class="supportBadge rarity${c.rarity}">${c.rarity}</span></div>
-    <p><b>${supportUnitLabel(c)}</b><br>${supportCardText(c)}<br>固有スキル：${supportTriggerDef(c.triggerId).name}<br>効果量：${c.units}/36　装備中の同一カード補正：×${mult.toFixed(2)}</p>
+    <p><b>${supportUnitLabel(c)}</b><br>${supportCardText(c)}<br>固有スキル：${supportTriggerDef(c.triggerId).name}<br>同一カード補正：×${mult.toFixed(2)}</p>
     <p class="muted supportCode">${c.code}</p>
     ${equippedAt>=0?`<button onclick="unequipSupport(${equippedAt})">スロット${equippedAt+1}から外す</button>`:`<button onclick="equipSupport('${c.id}')">装備する</button>`}
    </div>`;
@@ -932,12 +954,10 @@ function pMult(s){
  return 1+x*(1+int()/2000);
 }
 function stats(){
- const cap={攻撃力:1200,防御力:800,最大体力:2240,素早さ:1400,知力:1800};let o={};ST.forEach(s=>o[s]=(G.base[s]+G.perm[s])*pMult(s));return o}
-function rank(){
- const s=stats();
- const base=s.攻撃力*.5+s.防御力*.4+s.最大体力*.1+G.owned.length*11;
- const x=G.lv*.1;
- return base*(1+x/100);
+ const o={};const fullCount=supportTypeCards("満月").length;const full=Math.pow(.999,fullCount);ST.forEach(s=>o[s]=(G.base[s]+G.perm[s])*pMult(s)*full);return o;
+}
+function getStatCaps(){
+ const o={攻撃力:1200,防御力:800,最大体力:2240,素早さ:1400,知力:1800};ST.forEach(s=>o[s]+=supportActiveEffectSum("cap",s));return o;
 }
 function enemyRank(e){
  const lv=Array.isArray(e.level)?e.level[1]:e.level;
@@ -959,16 +979,14 @@ function weightSum(){return ST.reduce((a,s)=>a+G.weights[s],0)}
 function chance(s){return G.weights[s]/weightSum()*100}
 
 function gainExp(raw){
- if(G.lv>=100)return 0;
- const v=Math.min(35,Math.max(0,Math.floor(raw*(1+int()/2000))));
- G.xp+=v;
- while(G.lv<100&&G.xp>=100){G.xp-=100;G.lv++;G.mind++;grow();}
- return v;
+ if(G.lv>=100)return 0;const v=Math.max(0,Math.floor(raw*(1+int()/2000)*(1+supportGenericSum("exp")/100)));G.xp+=v;
+ while(G.lv<100&&G.xp>=100){G.xp-=100;G.lv++;G.mind+=1+supportGenericSum("mind");grow()}return v;
 }
 function grow(){
- let r=Math.random()*weightSum(),pick=ST[ST.length-1];
- for(const s of ST){r-=G.weights[s];if(r<=0){pick=s;break}}
- G.base[pick]+=Math.random()*G.max[pick];
+ const w={};ST.forEach(s=>w[s]=Math.max(.0001,G.weights[s]*(1+supportActiveEffectSum("rate",s)/100)));
+ const total=ST.reduce((a,s)=>a+w[s],0);let r=Math.random()*total,pick=ST[ST.length-1];for(const s of ST){r-=w[s];if(r<=0){pick=s;break}}
+ const gb=supportActiveEffectSum("growth",pick),hb=supportActiveEffectSum("history",pick),sb=supportActiveEffectSum("stat",pick);
+ G.base[pick]+=Math.random()*G.max[pick]*(1+gb/100)*(1+hb/100)+sb;
 }
 function spend(s,t){
  if(G.mind<1)return;
@@ -1004,64 +1022,71 @@ function battleExp(p,m,hp){
 }
 
 function fight(){
- const map=MAPS[G.map],m=pickEnemy(map),p=stats();let hp=p.最大体力,ehp=m.hp,log=[];
- log.push(["draw",`【遭遇】${m.name} と遭遇！ / Lv.${m.level} / 強さ指数 ${m.power.toLocaleString()}%`]);
- const pa=Math.max(1,Math.floor(p.素早さ/30)),ea=Math.max(1,Math.floor(m.spd/30));
+ const map=MAPS[G.map],m=pickEnemy(map),base=stats(),cards=equippedSupportCards(),log=[];let p={...base},hp=p.最大体力,ehp=m.hp,shield=0,damaged=false,pspd=p.素早さ;
+ const sea=supportTypeHas("海"),noon=supportTypeHas("真昼"),sunset=supportTypeHas("夕焼け"),sky=supportTypeHas("空"),mountain=supportTypeHas("山脈"),continent=supportTypeHas("大陸");
+ const waxing=supportTypeCards("上弦の月").length,waning=supportTypeCards("下弦の月").length,newMoon=supportTypeCards("新月").length,regenGuard=cards.some(c=>c.triggerId==="regen_guard");
+ const seaExtra=sea?Math.min(.5,Math.max(0,(enemyRank(m)-rank())/Math.max(1,rank()))*.5):0;
+ if(waxing)shield=p.最大体力*.03*waxing;
+ const pa=Math.max(1,Math.floor((pspd*(noon?1.03:1))/30)),ea=Math.max(1,Math.floor(m.spd/30));
+ log.push(["draw",`【遭遇】${m.name} と遭遇！ / Lv.${m.level} / 強さ指数 ${Number(m.power).toLocaleString()}%`]);if(shield)log.push(["player",`【上弦の月】シールド ${shield.toFixed(1)} を展開`]);
  for(let t=1;t<=200;t++){
-  const acts=[];for(let i=0;i<pa;i++)acts.push({w:"p",o:i/pa});for(let i=0;i<ea;i++)acts.push({w:"e",o:i/ea});acts.sort((a,b)=>a.o-b.o);
+  const acts=[];for(let i=0;i<pa;i++)acts.push({w:"p",o:i/pa});for(let i=0;i<ea;i++)acts.push({w:"e",o:i/ea});acts.sort((a,b)=>{
+   if(a.w!==b.w){
+     if(sea||noon)return a.w==="p"?-1:1;
+     if(playerRank!==enemyR)return playerRank>enemyR?-1:1;
+   }
+   return a.o-b.o;
+ });
   for(const a of acts){
-   if(a.w==="p"&&hp>0){let d=Math.max(1,p.攻撃力*.444*(.85+Math.random()*.3)-m.def*.25);ehp-=d;log.push(["player",`T${t} 主人公 → ${d.toFixed(1)}ダメージ`])}
-   if(a.w==="e"&&ehp>0){let d=Math.max(1,m.atk*(.85+Math.random()*.3)-p.防御力*.1);hp-=d;log.push(["enemy",`T${t} ${m.name} → ${d.toFixed(1)}ダメージ`])}
+   if(hp<=0||ehp<=0)break;const underHalf=hp<p.最大体力*.5,newMult=(newMoon&&!damaged)?1.005:1,def=p.防御力*newMult*(underHalf?1.05:1),atk=p.攻撃力*newMult;
+   if(a.w==="p"&&hp>0){
+    let d=Math.max(1,atk*.444*(.85+Math.random()*.3)-m.def*.25);if(sky&&pspd<m.spd)d*=1+Math.min(.2,(m.spd-pspd)/Math.max(1,m.spd));if(sea)d*=1+seaExtra;
+    ehp-=d;log.push(["player",`T${t} 主人公 → ${d.toFixed(1)}ダメージ`]);
+    if(waning){const rs=ST[Math.floor(Math.random()*ST.length)];p[rs]+=waning;log.push(["player",`【下弦の月】${rs} +${waning}P`])}
+    if(sunset){pspd*=.9;if(Math.random()<=.855){const d2=Math.max(1,atk*.444*(.85+Math.random()*.3)-m.def*.25);ehp-=d2;log.push(["player",`【夕焼け】追撃 → ${d2.toFixed(1)}ダメージ`])}else{pspd=p.素早さ;log.push(["player","【夕焼け】追撃が外れてリセット"])}}
+   }
+   if(a.w==="e"&&ehp>0){let d=Math.max(1,m.atk*(.85+Math.random()*.3)-def*.1);if(shield>0){const blocked=Math.min(shield,d);shield-=blocked;d-=blocked;if(blocked)log.push(["player",`【シールド】${blocked.toFixed(1)}軽減`])}if(d>0){hp-=d;damaged=true;log.push(["enemy",`T${t} ${m.name} → ${d.toFixed(1)}ダメージ`] )}}
+   if(regenGuard&&hp>0){const missing=Math.max(0,p.最大体力-hp),heal=missing*.005*(1+supportGenericSum("heal")/100);if(heal>0){hp=Math.min(p.最大体力,hp+heal);log.push(["player",`【固有スキル】HP +${heal.toFixed(2)}`])}}
   }
   if(hp<=0||ehp<=0){
-   if(hp>0&&ehp<=0){
-    const ex=battleExp(p,m,hp);gainExp(ex);G.gold+=m.gold;G.items++;
-    log.push(["win",`【勝利】 EXP +${ex} / Gold +${m.gold} / Item +1`]);
-    if(m.boss&&!m.nushi&&G.map===G.highest&&G.map<MAPS.length-1){
-      G.highest=G.map+1;
-      log.push(["win",`【エリアボス撃破】${MAPS[G.map+1].name} が解放されました！`]);
-    } else if(G.map>G.highest){
-      G.highest=G.map;
-      log.push(["win",`【新記録】最高クリア：${map.name}`]);
-    }
-   }else if(hp<=0&&ehp>0)log.push(["lose","【敗北】"]);
-   else log.push(["draw","【相打ち】同一ターン内で両者死亡"]);
-   break;
+   if(hp>0&&ehp<=0){let ex=battleExp(p,m,hp);if(mountain)ex=Math.floor(ex*1.01);gainExp(ex);const bb=supportGenericSum("battle");if(bb>0){const rs=ST[Math.floor(Math.random()*ST.length)],amt=Math.random()*G.max[rs]*(1+bb/100);G.base[rs]+=amt;log.push(["win",`【戦闘ボーナス】${rs} +${amt.toFixed(2)} 成長`])}let gold=m.gold*(mountain?1.01:1),items=1*(1+supportGenericSum("item")/100);if(continent)items*=1+Math.min(.1,Math.max(0,hp/p.最大体力)*.1);G.gold+=Math.floor(gold);G.items+=Math.max(1,Math.floor(items));log.push(["win",`【勝利】 EXP +${ex} / Gold +${Math.floor(gold)} / Item +${Math.max(1,Math.floor(items))}`]);if(m.boss&&!m.nushi&&G.map===G.highest&&G.map<MAPS.length-1){G.highest=G.map+1;log.push(["win",`【エリアボス撃破】${MAPS[G.map+1].name} が解放されました！`])}else if(G.map>G.highest){G.highest=G.map;log.push(["win",`【新記録】最高クリア：${map.name}`])}}
+   else if(hp<=0&&ehp>0)log.push(["lose","【敗北】"]);else log.push(["draw","【相打ち】同一ターン内で両者死亡"]);break;
   }
  }
- const box=document.getElementById("log");
- box.innerHTML=log.map(x=>`<div class="logLine ${x[0]}">${x[1]}</div>`).join("");
- render();
+ document.getElementById("log").innerHTML=log.map(x=>`<div class="logLine ${x[0]}">${x[1]}</div>`).join("");render();
 }
-
 function rebirth(){
  if(G.lv<100){alert("転生条件はLv100です。");return}
  const before=stats();G.rebirth++;G.rebirthPts+=5+Math.min(30,Math.floor(G.rebirth/10));
  ST.forEach(s=>G.base[s]=INIT[s]+G.perm[s]+before[s]*.01);
  for(let i=0;i<G.rebirth;i++)G.base[ST[Math.floor(Math.random()*ST.length)]]++;
- processMarkInheritance(); G.lv=1;G.xp=0;G.mind=5;G.personality=null; initResearch();
+ processMarkInheritance(); G.lv=1;G.xp=0;G.mind=5;G.personality=null;
  G.weights={攻撃力:20,防御力:20,最大体力:20,素早さ:20,知力:20};
  G.max={攻撃力:1,防御力:1,最大体力:1,素早さ:1,知力:1};
  alert("転生しました！真人格を再設定できます。");render();
 }
 function offline(){
- const now=Date.now();
- const h=Math.max(0,(now-G.offlineAt)/3600000),m=MAPS[G.highest];
- const tb=(h>=3?.05:0)+(h>=7?.09:0)+(h>=11?.10:0)+Math.floor(h/24)*.5;
- const lazy=G.personality==="怠惰"?.0001:1;
- const mult=(1+tb)*m.off*lazy;
- const ex=Math.min(35,Math.floor(25*h*mult*(1+int()/2000)));
- const gold=Math.floor(40*h*mult);
- const items=Math.max(0,Math.floor(h)-24);
- gainExp(ex);G.gold+=gold;G.items+=items;G.offlineAt=now;
- saveGame();
- alert(`放置報酬\n放置時間：${formatDuration(h*3600)}\nEXP +${ex}\nGold +${gold}\nItem +${items}`);
+ const r=applyOfflineOnOpen();if(!r)return;saveGame();alert(`放置報酬\n放置時間：${formatDuration(r.elapsed*3600)}\nEXP +${r.ex}\nGold +${r.gold}\nItem +${r.items}`);render();
+}
+function gachaHalf(){
+ const spend=Math.floor(Math.max(0,G.gold)/2);
+ const count=Math.floor(spend/1000);
+ if(count<=0){alert("一括ガチャには1000 Gold以上が必要です。");return}
+ G.gold-=count*1000;
+ const results={};
+ for(let i=0;i<count;i++){
+   const s=ST[Math.floor(Math.random()*ST.length)];
+   const v=(1+Math.random()*2)*(1+supportGenericSum("gacha")/100);
+   G.base[s]+=v;
+   results[s]=(results[s]||0)+v;
+ }
+ const lines=Object.entries(results).map(([s,v])=>`${s} +${v.toFixed(2)}`).join("\n");
+ document.getElementById("gachaResult").textContent=`一括${count}回：${count*1000} Gold使用\n${lines}`;
  render();
 }
 function gacha(){
- if(G.gold<1000){alert("お金がないときはガチャは引けないよ！\\n必要なGold：1000");return}
- G.gold-=1000;const s=ST[Math.floor(Math.random()*ST.length)],v=1+Math.random()*2;G.base[s]+=v;
- document.getElementById("gachaResult").textContent=s+" が +"+v.toFixed(2)+" 成長しました。";render();
+ if(G.gold<1000){alert("お金がないときはガチャは引けないよ！\n必要なGold：1000");return}
+ G.gold-=1000;const s=ST[Math.floor(Math.random()*ST.length)],v=(1+Math.random()*2)*(1+supportGenericSum("gacha")/100);G.base[s]+=v;document.getElementById("gachaResult").textContent=s+" が +"+v.toFixed(2)+" 成長しました。";render();
 }
 
 
@@ -1075,6 +1100,8 @@ function formatDuration(sec){
 function saveGame(){
  try{
   G.offlineAt=G.offlineAt||Date.now();
+  localStorage.setItem("idleGrowthGameSaveV42",JSON.stringify(G));
+  localStorage.setItem("idleGrowthGameSaveV41",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV40",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV39",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV38",JSON.stringify(G));
@@ -1082,7 +1109,7 @@ function saveGame(){
 }
 function loadGame(){
  try{
-  const raw=localStorage.getItem("idleGrowthGameSaveV40")||localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
+  const raw=localStorage.getItem("idleGrowthGameSaveV42")||localStorage.getItem("idleGrowthGameSaveV41")||localStorage.getItem("idleGrowthGameSaveV40")||localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
   if(raw){
    const saved=JSON.parse(raw);
    if(saved&&typeof saved==="object") Object.assign(G,saved);
@@ -1091,17 +1118,11 @@ function loadGame(){
  }catch(e){console.warn("load failed",e)}
 }
 function applyOfflineOnOpen(){
- const now=Date.now(), elapsed=Math.max(0,(now-(G.offlineAt||now))/3600000);
- if(elapsed<0.01)return null;
- const m=MAPS[Math.min(G.highest||0,MAPS.length-1)];
- const tb=(elapsed>=3?.05:0)+(elapsed>=7?.09:0)+(elapsed>=11?.10:0)+Math.floor(elapsed/24)*.5;
- const lazy=G.personality==="怠惰"?.0001:1;
- const mult=(1+tb)*m.off*lazy;
- const ex=Math.min(35,Math.floor(25*elapsed*mult*(1+int()/2000)));
- const gold=Math.floor(40*elapsed*mult);
- const items=Math.max(0,Math.floor(elapsed)-24);
- gainExp(ex);G.gold+=gold;G.items+=items;G.offlineAt=now;
- return {elapsed,ex,gold,items,mult,tb};
+ const now=Date.now();let elapsed=Math.max(0,(now-(G.offlineAt||now))/3600000);if(elapsed<.01)return null;
+ const m=MAPS[Math.min(G.highest||0,MAPS.length-1)],tb=(elapsed>=3?.05:0)+(elapsed>=7?.09:0)+(elapsed>=11?.10:0)+Math.floor(elapsed/24)*.5,lazy=G.personality==="怠惰"?.0001:1;
+ const accel=supportTypeHas("深夜")?1+Math.min(.01,elapsed/24*.01):1;elapsed*=accel;let mult=(1+tb)*m.off*lazy;if(supportTypeHas("朝日"))mult*=1.01;
+ const ex=Math.floor(25*elapsed*mult*(1+int()/2000)*(1+supportGenericSum("exp")/100)),gold=Math.floor(40*elapsed*mult);let items=Math.max(0,Math.floor(elapsed)-24);items=Math.floor(items*(1+supportGenericSum("item")/100));
+ gainExp(ex);G.gold+=gold;G.items+=items;G.offlineAt=now;return {elapsed,ex,gold,items,mult,tb,accel};
 }
 function showOfflineOnHome(r){
  const box=document.getElementById("offlineBox");
@@ -1121,7 +1142,7 @@ function render(){
  document.getElementById("gold").textContent=Math.floor(G.gold);document.getElementById("items").textContent=G.items;
  document.getElementById("pHome").textContent=G.personality||"未設定";document.getElementById("rebirth").textContent=G.rebirth;
  document.getElementById("intBonus").textContent=(int()/20).toFixed(2);
- const statCaps={攻撃力:1200,防御力:800,最大体力:2240,素早さ:1400,知力:1800};
+ const statCaps=getStatCaps();
 document.getElementById("stats").innerHTML=ST.map(x=>{
   const val=s[x], cap=statCaps[x];
   const pct=Math.min(100,Math.max(0,val/cap*100));
@@ -1168,6 +1189,7 @@ document.getElementById("battleBtn").onclick=fight;
 document.getElementById("offlineBtn").onclick=offline;
 document.getElementById("rebirthBtn").onclick=rebirth;
 document.getElementById("gachaBtn").onclick=gacha;
+ document.getElementById("gachaHalfBtn").addEventListener("click",gachaHalf);
 
 const redeemBtn=document.getElementById("redeemCodeBtn");
 if(redeemBtn){
