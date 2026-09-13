@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Idle Growth Game v42</title>
+<title>Idle Growth Game v43</title>
 <style>
 body{margin:0;background:#0b1118;color:#eef3f8;font-family:system-ui,sans-serif}
 .wrap{max-width:1100px;margin:auto;padding:18px}h1{margin:0 0 4px}
@@ -532,8 +532,8 @@ function supportEffectiveEffectsForCard(card){
 function equippedSupportCards(){normalizeSupport();return G.supportEquipped.map(id=>G.supportCards.find(c=>c.id===id)).filter(Boolean)}
 function supportMarkIndex(card){const t=SUPPORT_TYPES.find(x=>x.id===card.typeId);return SUPPORT_MARKS.indexOf(t?.marks.find(m=>m.id===card.markId)?.name||"")}
 function supportCompatibilityPercent(card){
- const all=equippedSupportCards(),ri=supportMarkIndex(card);if(ri<0)return 0;let total=0,skippedSelf=false;
- all.forEach(other=>{if(other===card&&!skippedSelf){skippedSelf=true;return}const ci=supportMarkIndex(other);if(ci<0)return;const v=SUPPORT_COMPAT[ri][ci];total+=v==="◎"?3:v==="〇"?1:v==="△"?-1:0});
+ const all=equippedSupportCards(),selfCol=supportMarkIndex(card);if(selfCol<0)return 0;let total=0,skippedSelf=false;
+ all.forEach(other=>{if(other===card&&!skippedSelf){skippedSelf=true;return}const otherRow=supportMarkIndex(other);if(otherRow<0)return;const v=SUPPORT_COMPAT[otherRow][selfCol];total+=v==="◎"?3:v==="〇"?1:v==="△"?-1:0});
  return total;
 }
 function supportTypePassiveMultiplier(card){const t=SUPPORT_TYPES.find(x=>x.id===card.typeId),m=t?.marks.find(x=>x.id===card.markId);return m?.name==="満月"?1.15:1}
@@ -684,8 +684,8 @@ window.openSupportWorkshop=openSupportWorkshop;
 function renderSupportCompatibilityTable(){
  const box=document.getElementById("supportCompatibilityTable");if(!box)return;
  const h=SUPPORT_MARKS.map(x=>`<th style="padding:5px;white-space:nowrap">${x}</th>`).join("");
- const rows=SUPPORT_MARKS.map((r,i)=>`<tr><th style="padding:5px;white-space:nowrap">${r}</th>${SUPPORT_COMPAT[i].map(v=>`<td style="padding:5px;text-align:center">${v}</td>`).join("")}</tr>`).join("");
- box.innerHTML=`<table style="border-collapse:collapse;font-size:12px"><thead><tr><th style="padding:5px">横\縦</th>${h}</tr></thead><tbody>${rows}</tbody></table>`;
+ const rows=SUPPORT_MARKS.map((other,i)=>`<tr><th style="padding:5px;white-space:nowrap">${other}</th>${SUPPORT_MARKS.map((self,j)=>`<td style="padding:5px;text-align:center">${SUPPORT_COMPAT[i][j]}</td>`).join("")}</tr>`).join("");
+ box.innerHTML=`<table style="border-collapse:collapse;font-size:12px"><thead><tr><th style="padding:5px">縦＝他\横＝そのサポカ</th>${h}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 function renderSupport(){
  normalizeSupport();
@@ -959,6 +959,12 @@ function stats(){
 function getStatCaps(){
  const o={攻撃力:1200,防御力:800,最大体力:2240,素早さ:1400,知力:1800};ST.forEach(s=>o[s]+=supportActiveEffectSum("cap",s));return o;
 }
+function rank(){
+ const s=stats();
+ const base=s.攻撃力*.5+s.防御力*.4+s.最大体力*.1+G.owned.length*11;
+ const x=G.lv*.1;
+ return base*(1+x/100);
+}
 function enemyRank(e){
  const lv=Array.isArray(e.level)?e.level[1]:e.level;
  return e.power*(1+lv*.1/100);
@@ -978,9 +984,28 @@ function pickEnemy(map){
 function weightSum(){return ST.reduce((a,s)=>a+G.weights[s],0)}
 function chance(s){return G.weights[s]/weightSum()*100}
 
+function adjustExpByTiers(amount){
+ let x=Math.max(0,Number(amount)||0),gain=0;
+ const first=Math.min(10,x);gain+=first;x-=first;
+ // 10を超えるたびに、その10P区間の効率を10%ずつ下げる：11-20は90%、21-30は80%……91-100は10%。
+ for(let tier=1;tier<=9&&x>0;tier++){
+   const chunk=Math.min(10,x);
+   gain+=chunk*Math.max(0,1-tier*.1);
+   x-=chunk;
+ }
+ // 100超～120：超過分の50%を反映
+ if(x>0){const chunk=Math.min(20,x);gain+=chunk*.5;x-=chunk;}
+ // 120超：超過分の30%を反映
+ if(x>0)gain+=x*.3;
+ return Math.max(0,Math.floor(gain));
+}
 function gainExp(raw){
- if(G.lv>=100)return 0;const v=Math.max(0,Math.floor(raw*(1+int()/2000)*(1+supportGenericSum("exp")/100)));G.xp+=v;
- while(G.lv<100&&G.xp>=100){G.xp-=100;G.lv++;G.mind+=1+supportGenericSum("mind");grow()}return v;
+ if(G.lv>=100)return 0;
+ const adjustedRaw=Math.max(0,Number(raw)||0)*(1+int()/2000)*(1+supportGenericSum("exp")/100);
+ const v=adjustExpByTiers(adjustedRaw);
+ G.xp+=v;
+ while(G.lv<100&&G.xp>=100){G.xp-=100;G.lv++;G.mind+=1+supportGenericSum("mind");grow()}
+ return v;
 }
 function grow(){
  const w={};ST.forEach(s=>w[s]=Math.max(.0001,G.weights[s]*(1+supportActiveEffectSum("rate",s)/100)));
@@ -1049,7 +1074,7 @@ function fight(){
    if(regenGuard&&hp>0){const missing=Math.max(0,p.最大体力-hp),heal=missing*.005*(1+supportGenericSum("heal")/100);if(heal>0){hp=Math.min(p.最大体力,hp+heal);log.push(["player",`【固有スキル】HP +${heal.toFixed(2)}`])}}
   }
   if(hp<=0||ehp<=0){
-   if(hp>0&&ehp<=0){let ex=battleExp(p,m,hp);if(mountain)ex=Math.floor(ex*1.01);gainExp(ex);const bb=supportGenericSum("battle");if(bb>0){const rs=ST[Math.floor(Math.random()*ST.length)],amt=Math.random()*G.max[rs]*(1+bb/100);G.base[rs]+=amt;log.push(["win",`【戦闘ボーナス】${rs} +${amt.toFixed(2)} 成長`])}let gold=m.gold*(mountain?1.01:1),items=1*(1+supportGenericSum("item")/100);if(continent)items*=1+Math.min(.1,Math.max(0,hp/p.最大体力)*.1);G.gold+=Math.floor(gold);G.items+=Math.max(1,Math.floor(items));log.push(["win",`【勝利】 EXP +${ex} / Gold +${Math.floor(gold)} / Item +${Math.max(1,Math.floor(items))}`]);if(m.boss&&!m.nushi&&G.map===G.highest&&G.map<MAPS.length-1){G.highest=G.map+1;log.push(["win",`【エリアボス撃破】${MAPS[G.map+1].name} が解放されました！`])}else if(G.map>G.highest){G.highest=G.map;log.push(["win",`【新記録】最高クリア：${map.name}`])}}
+   if(hp>0&&ehp<=0){let ex=battleExp(p,m,hp);if(mountain)ex=Math.floor(ex*1.01);gainExp(ex);const bb=supportGenericSum("battle");if(bb>0){const rs=ST[Math.floor(Math.random()*ST.length)],amt=Math.random()*G.max[rs]*(1+bb/100);G.base[rs]+=amt;log.push(["win",`【戦闘ボーナス】${rs} +${amt.toFixed(2)} 成長`])}let gold=m.gold*(mountain?1.01:1),items=1*(1+supportGenericSum("item")/100);if(continent)items*=1+Math.min(.1,Math.max(0,hp/p.最大体力)*.1);G.gold+=Math.floor(gold);G.items+=Math.max(1,Math.floor(items));log.push(["win",`【勝利】 EXP +${gotExp} / Gold +${Math.floor(gold)} / Item +${Math.max(1,Math.floor(items))}`]);if(m.boss&&!m.nushi&&G.map===G.highest&&G.map<MAPS.length-1){G.highest=G.map+1;log.push(["win",`【エリアボス撃破】${MAPS[G.map+1].name} が解放されました！`])}else if(G.map>G.highest){G.highest=G.map;log.push(["win",`【新記録】最高クリア：${map.name}`])}}
    else if(hp<=0&&ehp>0)log.push(["lose","【敗北】"]);else log.push(["draw","【相打ち】同一ターン内で両者死亡"]);break;
   }
  }
@@ -1100,6 +1125,7 @@ function formatDuration(sec){
 function saveGame(){
  try{
   G.offlineAt=G.offlineAt||Date.now();
+  localStorage.setItem("idleGrowthGameSaveV43",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV42",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV41",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV40",JSON.stringify(G));
@@ -1109,7 +1135,7 @@ function saveGame(){
 }
 function loadGame(){
  try{
-  const raw=localStorage.getItem("idleGrowthGameSaveV42")||localStorage.getItem("idleGrowthGameSaveV41")||localStorage.getItem("idleGrowthGameSaveV40")||localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
+  const raw=localStorage.getItem("idleGrowthGameSaveV43")||localStorage.getItem("idleGrowthGameSaveV42")||localStorage.getItem("idleGrowthGameSaveV41")||localStorage.getItem("idleGrowthGameSaveV40")||localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
   if(raw){
    const saved=JSON.parse(raw);
    if(saved&&typeof saved==="object") Object.assign(G,saved);
@@ -1122,7 +1148,7 @@ function applyOfflineOnOpen(){
  const m=MAPS[Math.min(G.highest||0,MAPS.length-1)],tb=(elapsed>=3?.05:0)+(elapsed>=7?.09:0)+(elapsed>=11?.10:0)+Math.floor(elapsed/24)*.5,lazy=G.personality==="怠惰"?.0001:1;
  const accel=supportTypeHas("深夜")?1+Math.min(.01,elapsed/24*.01):1;elapsed*=accel;let mult=(1+tb)*m.off*lazy;if(supportTypeHas("朝日"))mult*=1.01;
  const ex=Math.floor(25*elapsed*mult*(1+int()/2000)*(1+supportGenericSum("exp")/100)),gold=Math.floor(40*elapsed*mult);let items=Math.max(0,Math.floor(elapsed)-24);items=Math.floor(items*(1+supportGenericSum("item")/100));
- gainExp(ex);G.gold+=gold;G.items+=items;G.offlineAt=now;return {elapsed,ex,gold,items,mult,tb,accel};
+ const gotExp=gainExp(ex);G.gold+=gold;G.items+=items;G.offlineAt=now;return {elapsed,ex:gotExp,gold,items,mult,tb,accel};
 }
 function showOfflineOnHome(r){
  const box=document.getElementById("offlineBox");
