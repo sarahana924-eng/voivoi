@@ -436,6 +436,60 @@ const SUPPORT_MAX_UNITS=36;
 const SUPPORT_RARITY_POINTS={R:30,SR:45,SSR:60};
 const SUPPORT_STATS=["攻撃力","防御力","最大体力","素早さ","知力"];
 const SUPPORT_EFFECT_IDS=["cap","rate","growth","heal","battle","mind","gacha","item","exp","history","stat"];
+function supportSlots(){
+ const r=Math.max(0,Math.floor(Number(G.rebirth)||0));
+ const fixed=[0,5,15,30,50,75,105,140,180,225,275,330,390,455,525,600,680,765,855,950];
+ if(r<fixed[0])return 0;
+ if(r<fixed[fixed.length-1])return fixed.filter(x=>r>=x).length;
+ return 20+Math.floor((r-950)/100);
+}
+function supportFinalMultiplier(cardId){
+ const equipped=(G.supportEquipped||[]).filter(id=>id===cardId).length;
+ return 1+Math.min(6,Math.max(0,equipped-1))*0.05;
+}
+function normalizeSupport(){
+ if(!Array.isArray(G.supportCards))G.supportCards=[];
+ if(!Array.isArray(G.supportEquipped))G.supportEquipped=[];
+ G.supportCards=G.supportCards.filter(c=>c&&typeof c==="object").map((c,i)=>{
+   const rarity=SUPPORT_RARITIES.some(r=>r.id===c.rarity)?c.rarity:"R";
+   const type=SUPPORT_TYPES.find(t=>t.id===c.typeId)||SUPPORT_TYPES[0];
+   const mark=type.marks.find(m=>m.id===c.markId)||type.marks[0];
+   let effects=Array.isArray(c.effects)?c.effects:[];
+   if(!effects.length && c.effectId){
+     effects=[{effectId:c.effectId,points:Math.max(1,Math.floor(Number(c.units)||1)),enabled:true,stat:c.stat||null}];
+   }
+   effects=effects.filter(e=>SUPPORT_EFFECTS.some(d=>d.id===e.effectId)).map(e=>({
+     effectId:e.effectId,
+     points:Math.max(0,Math.floor(Number(e.points)||0)),
+     enabled:e.enabled!==false,
+     stat:e.stat&&SUPPORT_STATS.includes(e.stat)?e.stat:null
+   })).filter(e=>e.points>0);
+   const total=SUPPORT_RARITY_POINTS[rarity];
+   let sum=effects.reduce((a,e)=>a+e.points,0);
+   if(!effects.length)effects=[{effectId:"growth",points:total,enabled:true,stat:SUPPORT_STATS[0]}],sum=total;
+   if(sum!==total){
+     if(sum<total)effects[0].points+=total-sum;
+     else{
+       let excess=sum-total;
+       for(let j=effects.length-1;j>=0&&excess>0;j--){
+         const take=Math.min(excess,effects[j].points);
+         effects[j].points-=take;excess-=take;
+       }
+       effects=effects.filter(e=>e.points>0);
+     }
+   }
+   return {
+     id:c.id||("card-"+Date.now().toString(36)+"-"+i),
+     typeId:type.id,markId:mark.id,rarity,effects,
+     triggerId:SUPPORT_TRIGGERS.some(t=>t.id===c.triggerId)?c.triggerId:"normal",
+     code:c.code||makeSupportCode(),createdAt:Number(c.createdAt)||Date.now()
+   };
+ });
+ G.supportEquipped=G.supportEquipped.map(id=>G.supportCards.some(c=>c.id===id)?id:null);
+ const slots=supportSlots();
+ if(G.supportEquipped.length>slots)G.supportEquipped=G.supportEquipped.slice(0,slots);
+ while(G.supportEquipped.length<slots)G.supportEquipped.push(null);
+}
 function supportStoredEffects(card){
   return Array.isArray(card.effects)?card.effects:[];
 }
@@ -510,6 +564,7 @@ function openSupportWorkshop(){
  <div class="supportGrid">
   <label>レア度<select id="swRarity">${rarities}</select></label>
   <label>天星タイプ<select id="swType">${types}</select></label>
+  <label>固有スキル発動条件<select id="swTrigger">${SUPPORT_TRIGGERS.map(t=>`<option value="${t.id}">${t.name}：${t.parts===2?"2つの効果":"1つの効果"} / ${t.units}/36</option>`).join("")}</select></label>
  </div>
  <h4>固有能力のポイント配分</h4>
  <p class="muted">R=30P、SR=45P、SSR=60P。初期状態では自動配布されます。各能力のPを自由に調整できます。</p>
@@ -519,6 +574,7 @@ function openSupportWorkshop(){
  <button onclick="createSupportCard()">この内容で保存してカードコードを発行</button>`;
  document.getElementById("swRarity").addEventListener("change",()=>renderSupportEffectEditor(true));
  document.getElementById("swType").addEventListener("change",updateSupportPreview);
+ document.getElementById("swTrigger").addEventListener("change",updateSupportPreview);
  renderSupportEffectEditor(true);
 }
 function supportEffectRowHTML(id,points,enabled=true){
@@ -593,7 +649,8 @@ function updateSupportPreview(){
    const d=supportEffectDef(e.effectId),v=supportEffectValue(fake,e);
    return `${supportEffectLabel(e)}：${Number.isInteger(v)?v:v.toFixed(2)}${d.unit}`;
  });
- box.innerHTML=`<b>プレビュー</b><br>${supportRarityDef(rarity).name} / ${supportTypeName(fake)}<br>${lines.length?lines.join("<br>"):"固有能力なし"}`;
+ const trigger=supportTriggerDef(document.getElementById("swTrigger")?.value||"normal");
+ box.innerHTML=`<b>プレビュー</b><br>${supportRarityDef(rarity).name} / ${supportTypeName(fake)}<br>固有スキル：${trigger.name}（${trigger.units}/36）<br>${lines.length?lines.join("<br>"):"固有能力なし"}`;
 }
 function createSupportCard(){
  normalizeSupport();
@@ -602,7 +659,8 @@ function createSupportCard(){
  const used=effects.reduce((a,e)=>a+e.points,0);
  if(used!==total){alert(`制作ポイントを${total}Pちょうど配分してください。現在${used}Pです。`);return}
  const [typeId,markId]=(document.getElementById("swType")?.value||"moon|full").split("|");
- const card={id:"card-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8),typeId,markId,rarity,effects,code:makeSupportCode(),createdAt:Date.now()};
+ const triggerId=document.getElementById("swTrigger")?.value||"normal";
+ const card={id:"card-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8),typeId,markId,rarity,effects,triggerId,code:makeSupportCode(),createdAt:Date.now()};
  G.supportCards.push(card);saveGame();render();
  alert(`カードを保存しました。\n\n${rarity} / ${supportTypeName(card)}\n${effects.map(e=>supportEffectLabel(e)+":"+supportEffectValue(card,e)+supportEffectDef(e.effectId).unit).join("\n")}\nコード：${card.code}`);
 }
@@ -643,7 +701,12 @@ window.equipSupport=function(id){
  if(!G.supportCards.some(c=>c.id===id))return;
  G.supportEquipped[slot]=id;saveGame();render();
 }
-function supportEquippedFirstEmpty(){return G.supportEquipped.findIndex(x=>!x)}
+function supportEquippedFirstEmpty(){
+ const slots=supportSlots();
+ normalizeSupport();
+ for(let i=0;i<slots;i++)if(!G.supportEquipped[i])return i;
+ return -1;
+}
 window.unequipSupport=function(i){
  normalizeSupport();
  if(i>=0&&i<G.supportEquipped.length)G.supportEquipped[i]=null;
@@ -1012,13 +1075,14 @@ function formatDuration(sec){
 function saveGame(){
  try{
   G.offlineAt=G.offlineAt||Date.now();
+  localStorage.setItem("idleGrowthGameSaveV40",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV39",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV38",JSON.stringify(G));
  }catch(e){console.warn("save failed",e)}
 }
 function loadGame(){
  try{
-  const raw=localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
+  const raw=localStorage.getItem("idleGrowthGameSaveV40")||localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
   if(raw){
    const saved=JSON.parse(raw);
    if(saved&&typeof saved==="object") Object.assign(G,saved);
