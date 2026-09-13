@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Idle Growth Game v44</title>
+<title>Idle Growth Game v48</title>
 <style>
 body{margin:0;background:#0b1118;color:#eef3f8;font-family:system-ui,sans-serif}
 .wrap{max-width:1100px;margin:auto;padding:18px}h1{margin:0 0 4px}
@@ -150,6 +150,28 @@ button:hover{background:#2b3b4d}button:disabled{opacity:.45;cursor:not-allowed}
 <div class="panel">
 <h3>所持カード</h3>
 <div id="supportInventory" class="cards"></div>
+</div>
+<div class="panel">
+<h3>天星実装内容</h3>
+<div style="overflow:auto">
+<table style="border-collapse:collapse;width:100%;min-width:620px">
+<thead><tr><th style="padding:8px;text-align:left">天星タイプ</th><th style="padding:8px;text-align:left">実装効果</th></tr></thead>
+<tbody>
+<tr><td style="padding:8px"><b>満月</b></td><td style="padding:8px">全ステータス-0.1%、自身のサポカ効果+15%</td></tr>
+<tr><td style="padding:8px"><b>上弦の月</b></td><td style="padding:8px">戦闘開始時、最大HPの3%シールド</td></tr>
+<tr><td style="padding:8px"><b>下弦の月</b></td><td style="padding:8px">攻撃するたびランダムステータス+1P</td></tr>
+<tr><td style="padding:8px"><b>新月</b></td><td style="padding:8px">ダメージを受けていない間、全ステータス+0.5%</td></tr>
+<tr><td style="padding:8px"><b>空</b></td><td style="padding:8px">敵より遅いほど追加ダメージ、最大+20%</td></tr>
+<tr><td style="padding:8px"><b>山脈</b></td><td style="padding:8px">戦闘報酬EXP・Gold +1%</td></tr>
+<tr><td style="padding:8px"><b>大陸</b></td><td style="padding:8px">残りHPが高いほどアイテム増加、最大+10%</td></tr>
+<tr><td style="padding:8px"><b>海</b></td><td style="padding:8px">等級に関係なく先制、敵が強いほど追加ダメージ、最大+50%</td></tr>
+<tr><td style="padding:8px"><b>朝日</b></td><td style="padding:8px">放置報酬+1%</td></tr>
+<tr><td style="padding:8px"><b>真昼</b></td><td style="padding:8px">先制＋この戦闘だけ素早さ+3%</td></tr>
+<tr><td style="padding:8px"><b>夕焼け</b></td><td style="padding:8px">攻撃時に追撃、速度・命中低下。外れるとリセット</td></tr>
+<tr><td style="padding:8px"><b>深夜</b></td><td style="padding:8px">オフライン時間が長いほど時間経過を加速、最大+1%</td></tr>
+</tbody>
+</table>
+</div>
 </div>
 <div class="panel">
 <h3>天星タイプ相性</h3>
@@ -395,22 +417,22 @@ const MAPS=[
    ========================= */
 const SUPPORT_TYPES=[
  {id:"moon",name:"月",className:"supportMoon",marks:[
-   {id:"full",name:"満月",desc:"仲間を気遣いすぎる支援型"},
-   {id:"waxing",name:"上弦の月",desc:"まず守って様子を見る警戒型"},
-   {id:"waning",name:"下弦の月",desc:"仲間を褒めて士気を上げる鼓舞型"},
-   {id:"new",name:"新月",desc:"精神的に弱く、危険時に身を隠す型"}
+   {id:"full",name:"満月",desc:"全ステータス-0.1%、自身のサポカ効果+15%",effect:"全ステータス-0.1%、自身のサポカ効果+15%"},
+   {id:"waxing",name:"上弦の月",desc:"戦闘開始時、最大HPの3%シールド",effect:"戦闘開始時、最大HPの3%シールド"},
+   {id:"waning",name:"下弦の月",desc:"攻撃するたびランダムステータス+1P",effect:"攻撃するたびランダムステータス+1P"},
+   {id:"new",name:"新月",desc:"ダメージを受けていない間、全ステータス+0.5%",effect:"ダメージを受けていない間、全ステータス+0.5%"}
  ]},
  {id:"earth",name:"地球",className:"supportEarth",marks:[
-   {id:"sky",name:"空",desc:"裏で計算しつつ豪快に引っ張る型"},
-   {id:"mountain",name:"山脈",desc:"経験値・Goldの効率を徹底する型"},
-   {id:"continent",name:"大陸",desc:"尖ったマイナー武器を極める型"},
-   {id:"sea",name:"海",desc:"完璧に準備してから挑む型"}
+   {id:"sky",name:"空",desc:"敵より遅いほど追加ダメージ、最大+20%",effect:"敵より遅いほど追加ダメージ、最大+20%"},
+   {id:"mountain",name:"山脈",desc:"戦闘報酬EXP・Gold +1%",effect:"戦闘報酬EXP・Gold +1%"},
+   {id:"continent",name:"大陸",desc:"残りHPが高いほどアイテム増加、最大+10%",effect:"残りHPが高いほどアイテム増加、最大+10%"},
+   {id:"sea",name:"海",desc:"等級に関係なく先制、敵が強いほど追加ダメージ、最大+50%",effect:"等級に関係なく先制、敵が強いほど追加ダメージ、最大+50%"}
  ]},
  {id:"sun",name:"太陽",className:"supportSun",marks:[
-   {id:"dawn",name:"朝日",desc:"予定を変えて自由に探索する型"},
-   {id:"noon",name:"真昼",desc:"圧倒的速度で先制する型"},
-   {id:"sunset",name:"夕焼け",desc:"煽られると無理な敵にも挑む型"},
-   {id:"midnight",name:"深夜",desc:"パーティーを離れてソロで動く型"}
+   {id:"dawn",name:"朝日",desc:"放置報酬+1%",effect:"放置報酬+1%"},
+   {id:"noon",name:"真昼",desc:"先制＋この戦闘だけ素早さ+3%",effect:"先制＋この戦闘だけ素早さ+3%"},
+   {id:"sunset",name:"夕焼け",desc:"攻撃時に追撃、速度・命中低下。外れるとリセット",effect:"攻撃時に追撃、速度・命中低下。外れるとリセット"},
+   {id:"midnight",name:"深夜",desc:"オフライン時間が長いほど時間経過を加速、最大+1%",effect:"オフライン時間が長いほど時間経過を加速、最大+1%"}
  ]}
 ];
 const SUPPORT_EFFECTS=[
@@ -571,7 +593,7 @@ function supportCardText(card){
  const lines=[];
  (card.effects||[]).forEach(e=>{const d=supportEffectDef(e.effectId),v=supportEffectValue(card,e),val=Number.isInteger(v)?v:v.toFixed(2);lines.push(`${supportEffectLabel(e)}：${val}${d.unit}`)});
  const t=SUPPORT_TYPES.find(x=>x.id===card.typeId),m=t?.marks.find(x=>x.id===card.markId);
- if(m)lines.push(`<b>天星固有効果</b>：${m.desc}`);
+ if(m)lines.push(`<b>天星実装効果</b>：${m.effect||m.desc}`);
  lines.push(`相性補正：${supportCompatibilityPercent(card)>=0?"+":""}${supportCompatibilityPercent(card).toFixed(0)}%`);
  return lines.join("<br>");
 }
@@ -933,10 +955,15 @@ const PERSONALITIES=[
 let G={
 lv:1,xp:0,gold:500,items:0,mind:5,rebirth:0,rebirthPts:0,personality:null,map:0,highest:0,offlineAt:Date.now(),
 owned:[],marks:[],usedCodes:[],supportCards:[],supportEquipped:[],base:{...INIT},perm:{攻撃力:0,防御力:0,最大体力:0,素早さ:0,知力:0},
+capP:{攻撃力:100,防御力:100,最大体力:100,素早さ:100,知力:100},
 weights:{攻撃力:20,防御力:20,最大体力:20,素早さ:20,知力:20},
 max:{攻撃力:1,防御力:1,最大体力:1,素早さ:1,知力:1}
 };
 
+function normalizeCapPoints(){
+ if(!G.capP||typeof G.capP!=="object")G.capP={攻撃力:100,防御力:100,最大体力:100,素早さ:100,知力:100};
+ ST.forEach(s=>{const v=Number(G.capP[s]);G.capP[s]=Number.isFinite(v)?Math.max(0,Math.floor(v)):100});
+}
 function int(){return G.base.知力+G.perm.知力}
 function pMult(s){
  if(!G.personality)return 1;
@@ -956,8 +983,21 @@ function pMult(s){
 function stats(){
  const o={};const fullCount=supportTypeCards("満月").length;const full=Math.pow(.999,fullCount);ST.forEach(s=>o[s]=(G.base[s]+G.perm[s])*pMult(s)*full);return o;
 }
+function clampStatsToCaps(){
+ const caps=getStatCaps();
+ ST.forEach(s=>{
+   if(Number.isFinite(Number(G.base[s]))){
+     const maxBase=Math.max(0,caps[s]-G.perm[s]);
+     if(G.base[s]>maxBase)G.base[s]=maxBase;
+   }
+ });
+}
 function getStatCaps(){
- const o={攻撃力:1200,防御力:800,最大体力:2240,素早さ:1400,知力:1800};ST.forEach(s=>o[s]+=supportActiveEffectSum("cap",s));return o;
+ normalizeCapPoints();
+ const rate={攻撃力:.6,防御力:.4,最大体力:1.12,素早さ:.7,知力:.9};
+ const o={};
+ ST.forEach(s=>o[s]=G.capP[s]*rate[s]+supportActiveEffectSum("cap",s));
+ return o;
 }
 function rank(){
  const s=stats();
@@ -999,12 +1039,51 @@ function adjustExpByTiers(amount){
  if(x>0)gain+=x*.3;
  return Math.max(0,Math.floor(gain));
 }
+function applyExpReduction(amount){
+ let A=Math.max(0,Number(amount)||0);
+ let B=0;
+ // 10以下はそのまま。
+ if(A<=10)return A;
+ // 「10を1区切り」として毎回計算する。
+ // 1区切り目:100%、2区切り目:90%、…、10区切り目:10%
+ let rate=1;
+ while(A>10 && rate>=0.1){
+   B+=10*rate;
+   A-=10;
+   rate-=0.1;
+ }
+ if(A>0){
+   // 100を超えた残りは200まで50%
+   if(A<=100){
+     B+=A*0.5;
+     return B;
+   }
+   B+=100*0.5;
+   A-=100;
+   // 200を超えた残りは300まで10%
+   if(A<=100){
+     B+=A*0.1;
+     return B;
+   }
+   B+=100*0.1;
+   A-=100;
+   // 300を超えた残りは1%
+   B+=A*0.01;
+ }
+ return B;
+}
 function gainExp(raw){
  if(G.lv>=100)return 0;
- const adjustedRaw=Math.max(0,Number(raw)||0)*(1+int()/2000)*(1+supportGenericSum("exp")/100);
- const v=adjustExpByTiers(adjustedRaw);
+ const beforeSupport=Math.max(0,Number(raw)||0);
+ const boosted=beforeSupport*(1+int()/2000)*(1+supportGenericSum("exp")/100);
+ const v=Math.max(0,Math.floor(applyExpReduction(boosted)));
  G.xp+=v;
- while(G.lv<100&&G.xp>=100){G.xp-=100;G.lv++;G.mind+=1+supportGenericSum("mind");grow()}
+ while(G.lv<100&&G.xp>=100){
+   G.xp-=100;
+   G.lv++;
+   G.mind+=1+supportGenericSum("mind");
+   grow();
+ }
  return v;
 }
 function grow(){
@@ -1012,6 +1091,7 @@ function grow(){
  const total=ST.reduce((a,s)=>a+w[s],0);let r=Math.random()*total,pick=ST[ST.length-1];for(const s of ST){r-=w[s];if(r<=0){pick=s;break}}
  const gb=supportActiveEffectSum("growth",pick),hb=supportActiveEffectSum("history",pick),sb=supportActiveEffectSum("stat",pick);
  G.base[pick]+=Math.random()*G.max[pick]*(1+gb/100)*(1+hb/100)+sb;
+ clampStatsToCaps();
 }
 function spend(s,t){
  if(G.mind<1)return;
@@ -1064,7 +1144,7 @@ function fight(){
    return a.o-b.o;
  });
   for(const a of acts){
-   if(hp<=0||ehp<=0)break;const underHalf=hp<p.最大体力*.5,newMult=(newMoon&&!damaged)?1.005:1,def=p.防御力*newMult*(underHalf?1.05:1),atk=p.攻撃力*newMult;
+   if(hp<=0||ehp<=0)break;const underHalf=hp<p.最大体力*.5,newMult=(newMoon&&!damaged)?1.005:1,combat={};ST.forEach(s=>combat[s]=p[s]*newMult),def=combat.防御力*(underHalf?1.05:1),atk=combat.攻撃力;
    if(a.w==="p"&&hp>0){
     let d=Math.max(1,atk*.444*(.85+Math.random()*.3)-m.def*.25);if(sky&&pspd<m.spd)d*=1+Math.min(.2,(m.spd-pspd)/Math.max(1,m.spd));if(sea)d*=1+seaExtra;
     ehp-=d;log.push(["player",`T${t} 主人公 → ${d.toFixed(1)}ダメージ`]);
@@ -1075,7 +1155,7 @@ function fight(){
    if(regenGuard&&hp>0){const missing=Math.max(0,p.最大体力-hp),heal=missing*.005*(1+supportGenericSum("heal")/100);if(heal>0){hp=Math.min(p.最大体力,hp+heal);log.push(["player",`【固有スキル】HP +${heal.toFixed(2)}`])}}
   }
   if(hp<=0||ehp<=0){
-   if(hp>0&&ehp<=0){let ex=battleExp(p,m,hp);if(mountain)ex=Math.floor(ex*1.01);gainExp(ex);const bb=supportGenericSum("battle");if(bb>0){const rs=ST[Math.floor(Math.random()*ST.length)],amt=Math.random()*G.max[rs]*(1+bb/100);G.base[rs]+=amt;log.push(["win",`【戦闘ボーナス】${rs} +${amt.toFixed(2)} 成長`])}let gold=m.gold*(mountain?1.01:1),items=1*(1+supportGenericSum("item")/100);if(continent)items*=1+Math.min(.1,Math.max(0,hp/p.最大体力)*.1);G.gold+=Math.floor(gold);G.items+=Math.max(1,Math.floor(items));log.push(["win",`【勝利】 EXP +${ex} / Gold +${Math.floor(gold)} / Item +${Math.max(1,Math.floor(items))}`]);if(m.boss&&!m.nushi&&G.map===G.highest&&G.map<MAPS.length-1){G.highest=G.map+1;log.push(["win",`【エリアボス撃破】${MAPS[G.map+1].name} が解放されました！`])}else if(G.map>G.highest){G.highest=G.map;log.push(["win",`【新記録】最高クリア：${map.name}`])}}
+   if(hp>0&&ehp<=0){let ex=battleExp(p,m,hp);if(mountain)ex=Math.floor(ex*1.01);gainExp(ex);const bb=supportGenericSum("battle");if(bb>0){const rs=ST[Math.floor(Math.random()*ST.length)],amt=Math.random()*G.max[rs]*(1+bb/100);G.base[rs]+=amt;clampStatsToCaps();log.push(["win",`【戦闘ボーナス】${rs} +${amt.toFixed(2)} 成長`])}let gold=m.gold*(mountain?1.01:1),items=1*(1+supportGenericSum("item")/100);if(continent)items*=1+Math.min(.1,Math.max(0,hp/p.最大体力)*.1);G.gold+=Math.floor(gold);G.items+=Math.max(1,Math.floor(items));log.push(["win",`【勝利】 EXP +${ex} / Gold +${Math.floor(gold)} / Item +${Math.max(1,Math.floor(items))}`]);if(m.boss&&!m.nushi&&G.map===G.highest&&G.map<MAPS.length-1){G.highest=G.map+1;log.push(["win",`【エリアボス撃破】${MAPS[G.map+1].name} が解放されました！`])}else if(G.map>G.highest){G.highest=G.map;log.push(["win",`【新記録】最高クリア：${map.name}`])}}
    else if(hp<=0&&ehp>0)log.push(["lose","【敗北】"]);else log.push(["draw","【相打ち】同一ターン内で両者死亡"]);break;
   }
  }
@@ -1086,6 +1166,8 @@ function rebirth(){
  const before=stats();G.rebirth++;G.rebirthPts+=5+Math.min(30,Math.floor(G.rebirth/10));
  ST.forEach(s=>G.base[s]=INIT[s]+G.perm[s]+before[s]*.01);
  for(let i=0;i<G.rebirth;i++)G.base[ST[Math.floor(Math.random()*ST.length)]]++;
+ normalizeCapPoints(); ST.forEach(s=>G.capP[s]+=10);
+ clampStatsToCaps();
  processMarkInheritance(); G.lv=1;G.xp=0;G.mind=5;G.personality=null;
  G.weights={攻撃力:20,防御力:20,最大体力:20,素早さ:20,知力:20};
  G.max={攻撃力:1,防御力:1,最大体力:1,素早さ:1,知力:1};
@@ -1106,13 +1188,14 @@ function gachaHalf(){
    G.base[s]+=v;
    results[s]=(results[s]||0)+v;
  }
+ clampStatsToCaps();
  const lines=Object.entries(results).map(([s,v])=>`${s} +${v.toFixed(2)}`).join("\n");
  document.getElementById("gachaResult").textContent=`一括${count}回：${count*1000} Gold使用\n${lines}`;
  render();
 }
 function gacha(){
  if(G.gold<1000){alert("お金がないときはガチャは引けないよ！\n必要なGold：1000");return}
- G.gold-=1000;const s=ST[Math.floor(Math.random()*ST.length)],v=(1+Math.random()*2)*(1+supportGenericSum("gacha")/100);G.base[s]+=v;document.getElementById("gachaResult").textContent=s+" が +"+v.toFixed(2)+" 成長しました。";render();
+ G.gold-=1000;const s=ST[Math.floor(Math.random()*ST.length)],v=(1+Math.random()*2)*(1+supportGenericSum("gacha")/100);G.base[s]+=v;clampStatsToCaps();document.getElementById("gachaResult").textContent=s+" が +"+v.toFixed(2)+" 成長しました。";render();
 }
 
 
@@ -1126,6 +1209,10 @@ function formatDuration(sec){
 function saveGame(){
  try{
   G.offlineAt=G.offlineAt||Date.now();
+  localStorage.setItem("idleGrowthGameSaveV49",JSON.stringify(G));
+  localStorage.setItem("idleGrowthGameSaveV48",JSON.stringify(G));
+  localStorage.setItem("idleGrowthGameSaveV46",JSON.stringify(G));
+  localStorage.setItem("idleGrowthGameSaveV45",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV44",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV43",JSON.stringify(G));
   localStorage.setItem("idleGrowthGameSaveV42",JSON.stringify(G));
@@ -1137,7 +1224,7 @@ function saveGame(){
 }
 function loadGame(){
  try{
-  const raw=localStorage.getItem("idleGrowthGameSaveV44")||localStorage.getItem("idleGrowthGameSaveV43")||localStorage.getItem("idleGrowthGameSaveV42")||localStorage.getItem("idleGrowthGameSaveV41")||localStorage.getItem("idleGrowthGameSaveV40")||localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
+  const raw=localStorage.getItem("idleGrowthGameSaveV49")||localStorage.getItem("idleGrowthGameSaveV48")||localStorage.getItem("idleGrowthGameSaveV46")||localStorage.getItem("idleGrowthGameSaveV45")||localStorage.getItem("idleGrowthGameSaveV44")||localStorage.getItem("idleGrowthGameSaveV43")||localStorage.getItem("idleGrowthGameSaveV42")||localStorage.getItem("idleGrowthGameSaveV41")||localStorage.getItem("idleGrowthGameSaveV40")||localStorage.getItem("idleGrowthGameSaveV39")||localStorage.getItem("idleGrowthGameSaveV38")||localStorage.getItem("idleGrowthGameSaveV36")||localStorage.getItem("idleGrowthGameSaveV34");
   if(raw){
    const saved=JSON.parse(raw);
    if(saved&&typeof saved==="object") Object.assign(G,saved);
@@ -1159,7 +1246,8 @@ function showOfflineOnHome(r){
 }
 
 function render(){
-
+ normalizeCapPoints();
+ clampStatsToCaps();
  renderMarks();
  renderSupport();
  const s=stats();
@@ -1175,7 +1263,8 @@ document.getElementById("stats").innerHTML=ST.map(x=>{
   const val=s[x], cap=statCaps[x];
   const pct=Math.min(100,Math.max(0,val/cap*100));
   return `<div class="statCard">
-    <div class="statTop"><span class="statName">${x}</span><span class="statValue">${val.toFixed(2)} / ${cap}</span></div>
+    <div class="statTop"><span class="statName">${x}</span><span class="statValue">${val.toFixed(2)} / ${cap.toFixed(2)}</span></div>
+    <div class="muted" style="font-size:12px">上限P：${G.capP[x]}P</div>
     <div class="statBar"><i style="width:${pct}%"></i></div>
   </div>`;
 }).join("");
